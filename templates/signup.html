@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="max-w-md mx-auto bg-white p-8 rounded-xl shadow">
+  <h1 class="text-2xl font-bold mb-6">Create your account</h1>
+
+  <form method="POST">
+    <label class="block mb-4">
+      <span class="text-gray-700">Email</span>
+      <input type="email" name="email" required
+             class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" />
+    </label>
+
+    <label class="block mb-6">
+      <span class="text-gray-700">Password</span>
+      <input type="password" name="password" required
+             class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" />
+    </label>
+
+    <button class="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+      Create Account
+    </button>
+  </form>
+</div>
+{% endblock %}
