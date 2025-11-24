@@ -5,3 +5,8 @@ Flask-SQLAlchemy
 gunicorn
 psycopg2-binary
 python-dotenv
+werkzeug
+textract
+docconverter
+beautifulsoup4
+lxml

@@ -1,0 +1,183 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow">
+
+  <!-- Header / Intro Section -->
+  <div class="flex items-start justify-between mb-6">
+
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900 mb-2">Your CV Details</h1>
+      <p class="text-gray-600 text-sm leading-relaxed max-w-lg">
+        This is the structured information extracted from your CV.
+        HiredNow AI uses this data to automatically create personalised CVs
+        tailored for each job you apply to.
+      </p>
+    </div>
+
+    <!-- Button Group -->
+    <div class="flex flex-col space-y-2 ml-6">
+
+      <!-- Edit button -->
+      <a href="{{ url_for('onboarding.edit_cv') }}"
+         class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow transition text-center">
+        Edit CV
+      </a>
+
+      <!-- Dashboard button -->
+      <a href="{{ url_for('dashboard.dashboard_home') }}"
+         class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold py-2 px-4 rounded-lg shadow-sm transition text-center">
+        Go to Dashboard
+      </a>
+
+    </div>
+
+  </div>
+
+  {% if not cv %}
+    <p class="text-gray-600">No CV data found.</p>
+  {% else %}
+
+    <h2 class="text-xl font-semibold mt-6">Personal Details</h2>
+<ul class="text-gray-700 ml-6 list-disc">
+  <li>Name: {{ cv.first_name }} {{ cv.last_name }}</li>
+  <li>Email: {{ cv.email }}</li>
+  <li>Phone: {{ cv.phone }}</li>
+  <li>Address: {{ cv.address }}</li>
+</ul>
+
+
+  <!-- Summary -->
+  <h2 class="text-xl font-semibold mt-4">Summary</h2>
+  {% if cv.summary %}
+    <p class="text-gray-700">{{ cv.summary }}</p>
+  {% else %}
+    <div class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg p-3 mt-2">
+      No summary available yet —
+      <a href="{{ url_for('onboarding.edit_cv') }}" class="text-blue-600 hover:underline">
+        add more details
+      </a>.
+    </div>
+  {% endif %}
+
+  <!-- Skills -->
+  <h2 class="text-xl font-semibold mt-4">Skills</h2>
+  {% if cv.skills and cv.skills|length > 0 %}
+    <ul class="list-disc ml-6 text-gray-700">
+      {% for skill in cv.skills %}
+        <li>{{ skill }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg p-3 mt-2">
+      No skills listed yet —
+      <a href="{{ url_for('onboarding.edit_cv') }}" class="text-blue-600 hover:underline">
+        add more details
+      </a>.
+    </div>
+  {% endif %}
+
+  <!-- Job Titles -->
+  <h2 class="text-xl font-semibold mt-4">Job Titles</h2>
+  {% if cv.job_titles and cv.job_titles|length > 0 %}
+    <ul class="list-disc ml-6 text-gray-700">
+      {% for title in cv.job_titles %}
+        <li>{{ title }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg p-3 mt-2">
+      No job titles detected yet —
+      <a href="{{ url_for('onboarding.edit_cv') }}" class="text-blue-600 hover:underline">
+        add more details
+      </a>.
+    </div>
+  {% endif %}
+
+  <!-- Experience -->
+  <h2 class="text-xl font-semibold mt-4">Experience</h2>
+  {% if cv.experience and cv.experience|length > 0 %}
+    {% for exp in cv.experience %}
+      <div class="border p-3 rounded mt-3">
+        <p><strong>{{ exp.role }}</strong> at {{ exp.company }}</p>
+        <p class="text-sm text-gray-500">
+          {{ exp.start_date }} - {{ exp.end_date }}
+        </p>
+        <p>{{ exp.description }}</p>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg p-3 mt-2">
+      No experience added yet —
+      <a href="{{ url_for('onboarding.edit_cv') }}" class="text-blue-600 hover:underline">
+        add more details
+      </a>.
+    </div>
+  {% endif %}
+
+  <!-- Education -->
+  <h2 class="text-xl font-semibold mt-4">Education</h2>
+  {% if cv.education and cv.education|length > 0 %}
+    {% for edu in cv.education %}
+      <div class="border p-3 rounded mt-3">
+        <p><strong>{{ edu.degree }}</strong></p>
+        <p>{{ edu.institution }}</p>
+        <p class="text-sm text-gray-500">{{ edu.graduation_year }}</p>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg p-3 mt-2">
+      No education history added yet —
+      <a href="{{ url_for('onboarding.edit_cv') }}" class="text-blue-600 hover:underline">
+        add more details
+      </a>.
+    </div>
+  {% endif %}
+
+  <!-- Certifications -->
+  <h2 class="text-xl font-semibold mt-4">Certifications</h2>
+  {% if cv.certifications and cv.certifications|length > 0 %}
+    <ul class="list-disc ml-6 text-gray-700">
+      {% for cert in cv.certifications %}
+        <li>{{ cert }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg p-3 mt-2">
+      No certifications listed yet —
+      <a href="{{ url_for('onboarding.edit_cv') }}" class="text-blue-600 hover:underline">
+        add more details
+      </a>.
+    </div>
+  {% endif %}
+
+  <!-- Languages -->
+  <h2 class="text-xl font-semibold mt-4">Languages</h2>
+  {% if cv.languages and cv.languages|length > 0 %}
+    <ul class="list-disc ml-6 text-gray-700">
+      {% for lang in cv.languages %}
+        <li>{{ lang }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg p-3 mt-2">
+      No languages added yet —
+      <a href="{{ url_for('onboarding.edit_cv') }}" class="text-blue-600 hover:underline">
+        add more details
+      </a>.
+    </div>
+  {% endif %}
+
+  {% endif %}
+
+    <h2 class="text-xl font-semibold mt-6">Additional Details</h2>
+<div class="mt-3 text-gray-700">
+  {% for key, value in cv.additional_details.items() %}
+    {% if value %}
+      <p class="mb-1"><strong>{{ key|capitalize }}:</strong> {{ value }}</p>
+    {% endif %}
+  {% endfor %}
+</div>
+
+</div>
+{% endblock %}

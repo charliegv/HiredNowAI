@@ -1,0 +1,236 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+
+  <!-- Header -->
+  <div class="mb-6">
+    <h1 class="text-2xl font-semibold text-gray-900">Your preferences</h1>
+    <p class="text-gray-600 text-sm mt-1">
+      Tell HiredNow AI how and where you want to work so we can target the right roles for you.
+    </p>
+  </div>
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="mb-4 p-3 rounded-md
+          {% if category == 'error' %}
+            bg-red-100 text-red-700
+          {% else %}
+            bg-green-100 text-green-700
+          {% endif %}
+        ">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST" enctype="multipart/form-data" class="space-y-8">
+
+    <!-- APPLICATION MODE -->
+<section>
+  <h2 class="text-xl font-semibold mb-2">Application mode</h2>
+  <p class="text-gray-500 text-sm mb-4">
+    Choose whether HiredNow AI applies automatically, or waits for your approval.
+  </p>
+
+  <select name="application_mode"
+          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600">
+
+    <option value="auto" {% if profile.application_mode == "auto" %}selected{% endif %}>Auto-apply</option>
+    <option value="approval" {% if profile.application_mode == "approval" %}selected{% endif %}>Approval required</option>
+
+  </select>
+</section>
+
+<!-- MATCHING STRICTNESS -->
+<section>
+  <h2 class="text-xl font-semibold mb-2">Job match strictness</h2>
+  <p class="text-gray-500 text-sm mb-4">
+    Control how narrow or broad your recommended job matches should be.
+  </p>
+
+  <select name="match_mode"
+          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600">
+
+    <option value="safe" {% if profile.match_mode == "safe" %}selected{% endif %}>Safe — Very strict matching</option>
+    <option value="standard" {% if profile.match_mode == "standard" %}selected{% endif %}>Standard — Balanced</option>
+    <option value="adventurous" {% if profile.match_mode == "adventurous" %}selected{% endif %}>Adventurous — Broad, creative matching</option>
+
+  </select>
+</section>
+
+
+    <!-- JOB TITLES -->
+    <section>
+      <h2 class="text-xl font-semibold mb-2">Job title preferences</h2>
+      <p class="text-gray-500 text-sm mb-4">
+        Add the roles you want HiredNow AI to target first.
+      </p>
+
+      <label class="block">
+        <span class="text-gray-700">Target job titles</span>
+        <input
+          type="text"
+          name="job_titles"
+          value="{{ profile.job_titles or '' }}"
+          placeholder="Software Engineer, Marketing Manager"
+          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
+        />
+        <span class="text-xs text-gray-500">
+          Separate multiple titles with commas.
+        </span>
+      </label>
+    </section>
+
+    <!-- LOCATION -->
+    <section>
+      <h2 class="text-xl font-semibold mb-2">Location preferences</h2>
+      <p class="text-gray-500 text-sm mb-4">
+        These are used together with your latitude and longitude to match nearby roles.
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <label class="block">
+          <span class="text-gray-700">City</span>
+          <input
+            type="text"
+            name="city"
+            value="{{ profile.city or '' }}"
+            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
+          />
+        </label>
+
+        <label class="block">
+          <span class="text-gray-700">State or region</span>
+          <input
+            type="text"
+            name="state"
+            value="{{ profile.state or '' }}"
+            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
+          />
+        </label>
+
+        <label class="block">
+          <span class="text-gray-700">Country</span>
+          <select
+            name="country"
+            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
+          >
+            <option value="">Select country</option>
+            <option value="United Kingdom" {% if profile.country == "United Kingdom" %}selected{% endif %}>United Kingdom</option>
+            <option value="United States" {% if profile.country == "United States" %}selected{% endif %}>United States</option>
+            <option value="Canada" {% if profile.country == "Canada" %}selected{% endif %}>Canada</option>
+            <option value="Australia" {% if profile.country == "Australia" %}selected{% endif %}>Australia</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="mt-4">
+        <label class="inline-flex items-center">
+          <input
+            type="checkbox"
+            name="remote_preference"
+            {% if profile.remote_preference %}checked{% endif %}
+            class="h-5 w-5 text-blue-600 rounded"
+          />
+          <span class="ml-2 text-gray-700">I am happy with fully remote roles</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- SALARY -->
+    <section>
+      <h2 class="text-xl font-semibold mb-2">Salary range</h2>
+      <p class="text-gray-500 text-sm mb-4">
+        We will prioritise roles that fall inside this range where possible.
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <label class="block">
+          <span class="text-gray-700">Minimum salary</span>
+          <input
+            type="number"
+            name="min_salary"
+            value="{{ profile.min_salary or '' }}"
+            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
+          />
+        </label>
+
+        <label class="block">
+          <span class="text-gray-700">Maximum salary</span>
+          <input
+            type="number"
+            name="max_salary"
+            value="{{ profile.max_salary or '' }}"
+            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
+          />
+        </label>
+      </div>
+    </section>
+
+    <!-- APPLICATION FREQUENCY -->
+    <section>
+      <h2 class="text-xl font-semibold mb-2">Application frequency</h2>
+      <p class="text-gray-500 text-sm mb-4">
+        Control how often HiredNow AI applies on your behalf.
+      </p>
+
+      <label class="block">
+        <select
+          name="application_frequency"
+          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
+        >
+          <option value="hourly" {% if profile.application_frequency == "hourly" %}selected{% endif %}>Apply throughout the day</option>
+          <option value="daily" {% if profile.application_frequency == "daily" %}selected{% endif %}>Apply once per day</option>
+          <option value="twice_daily" {% if profile.application_frequency == "twice_daily" %}selected{% endif %}>Apply twice per day</option>
+          <option value="weekly" {% if profile.application_frequency == "weekly" %}selected{% endif %}>Apply a few times per week</option>
+        </select>
+      </label>
+    </section>
+
+<!-- CV SECTION -->
+<section>
+  <h2 class="text-xl font-semibold mb-2">Your CV</h2>
+  <p class="text-gray-500 text-sm mb-4">
+    This is the structured CV profile HiredNow AI uses when tailoring applications for each role.
+  </p>
+
+  <div class="border rounded-lg p-4 bg-gray-50 flex items-center justify-between">
+
+    <div>
+      {% if profile.ai_cv_data %}
+        <p class="text-gray-700 text-sm">
+          Your CV has been analysed and is ready to personalise for each job.
+        </p>
+      {% else %}
+        <p class="text-gray-700 text-sm">
+          You haven't uploaded a CV yet — complete the CV setup to improve your applications.
+        </p>
+      {% endif %}
+    </div>
+
+    <a href="{{ url_for('onboarding.cv_preview') }}"
+       class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow transition">
+      View CV Details
+    </a>
+
+  </div>
+</section>
+
+
+    <!-- SAVE BUTTON -->
+    <div>
+      <button
+        class="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
+      >
+        Save preferences
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

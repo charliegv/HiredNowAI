@@ -1,0 +1,270 @@
+from flask import Blueprint, render_template, request, redirect, url_for
+from flask_login import login_required, current_user
+from models import db, Profile
+from werkzeug.utils import secure_filename
+from utils.cv_parser import extract_cv_text
+from utils.cv_ai import parse_cv_with_ai
+from utils.geocode import geocode_city
+from matching import match_user
+import psycopg2
+import os
+
+onboarding = Blueprint("onboarding", __name__)
+
+UPLOAD_FOLDER = "uploads/cvs"
+
+
+# =========================================================
+# STEP 1 — Ensure a Profile always exists
+# =========================================================
+def get_or_create_profile():
+    profile = Profile.query.filter_by(user_id=current_user.id).first()
+    if not profile:
+        profile = Profile(user_id=current_user.id)
+        db.session.add(profile)
+        db.session.commit()
+    return profile
+
+
+# =========================================================
+# STEP 1 — Job titles + location
+# =========================================================
+@onboarding.route("/onboarding/step1", methods=["GET", "POST"])
+@login_required
+def step1():
+    profile = get_or_create_profile()
+
+    if request.method == "POST":
+        profile.job_titles = request.form["job_titles"]
+        profile.city = request.form["city"]
+        profile.country = request.form["country"]
+
+        # Safe geocoding
+        try:
+            lat, lon = geocode_city(profile.city, profile.country)
+        except Exception:
+            lat, lon = None, None
+
+        profile.latitude = lat
+        profile.longitude = lon
+
+        db.session.commit()
+        return redirect(url_for("onboarding.step2"))
+
+    return render_template("onboarding_step1.html", step=1, progress=33)
+
+
+
+# =========================================================
+# STEP 2 — Salary + Remote Preference
+# =========================================================
+@onboarding.route("/onboarding/step2", methods=["GET", "POST"])
+@login_required
+def step2():
+    profile = get_or_create_profile()
+
+    if request.method == "POST":
+        profile.min_salary = request.form["min_salary"]
+        profile.remote_preference = "remote_preference" in request.form
+
+        # Optional miles filter (if included in form)
+        if "miles_distance" in request.form:
+            try:
+                profile.miles_distance = int(request.form["miles_distance"])
+            except:
+                profile.miles_distance = None
+
+        db.session.commit()
+        return redirect(url_for("onboarding.step3"))
+
+    # Prevent skipping step 1
+    if not profile.job_titles or not profile.city:
+        return redirect(url_for("onboarding.step1"))
+
+    return render_template("onboarding_step2.html", step=2, progress=66)
+
+
+
+# =========================================================
+# STEP 3 — CV + Final settings + Matching Trigger
+# =========================================================
+@onboarding.route("/onboarding/step3", methods=["GET", "POST"])
+@login_required
+def step3():
+    profile = get_or_create_profile()
+
+    if request.method == "POST":
+
+        # Save final preferences
+        profile.application_frequency = request.form.get("application_frequency")
+        profile.application_mode = request.form.get("application_mode", "auto")
+        profile.match_mode = request.form.get("match_mode", "standard")
+
+        # Handle CV (optional)
+        file = request.files.get("cv_file")
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+
+            user_folder = os.path.join(UPLOAD_FOLDER, str(current_user.id))
+            os.makedirs(user_folder, exist_ok=True)
+
+            cv_path = os.path.join(user_folder, filename)
+            file.save(cv_path)
+
+            profile.cv_location = cv_path
+
+            # Extract + AI parse
+            raw_text = extract_cv_text(cv_path)
+            parsed = parse_cv_with_ai(raw_text)
+            profile.ai_cv_data = parsed
+
+        # Mark onboarding complete
+        profile.onboarding_complete = True
+        db.session.commit()
+
+        # ==================================================
+        # Only run matching AFTER onboarding is 100 percent complete
+        # ==================================================
+        try:
+            print(f"[MATCH] Running initial matching for User.id={current_user.id} Profile.id={profile.id}")
+            conn = psycopg2.connect(os.environ["DATABASE_URL"])
+            match_user(conn, current_user.id)
+        except Exception as e:
+            print("Error running initial matching:", e)
+
+        return redirect(url_for("onboarding.edit_cv"))
+
+    return render_template("onboarding_step3.html", profile=profile)
+
+
+
+# =========================================================
+# CV Preview
+# =========================================================
+@onboarding.route("/cv/preview")
+@login_required
+def cv_preview():
+    profile = get_or_create_profile()
+    return render_template("cv_preview.html", cv=profile.ai_cv_data, profile=profile)
+
+
+
+# =========================================================
+# CV Edit
+# =========================================================
+@onboarding.route("/cv/edit", methods=["GET", "POST"])
+@login_required
+def edit_cv():
+    profile = get_or_create_profile()
+
+    if request.method == "POST":
+
+        def split_clean(value):
+            if not value:
+                return []
+            return [v.strip() for v in value.split(",") if v.strip()]
+
+        # Update JSON CV
+        updated_data = {
+            "first_name": request.form.get("first_name", ""),
+            "last_name": request.form.get("last_name", ""),
+            "email": request.form.get("email", ""),
+            "phone": request.form.get("phone", ""),
+            "address": request.form.get("address", ""),
+
+            "summary": request.form.get("summary", ""),
+            "skills": split_clean(request.form.get("skills")),
+            "job_titles": split_clean(request.form.get("job_titles")),
+
+            "experience": [],
+            "education": [],
+            "certifications": split_clean(request.form.get("certifications")),
+            "languages": split_clean(request.form.get("languages")),
+
+            "additional_details": {
+                "publications": split_clean(request.form.get("publications")),
+                "github": request.form.get("github", ""),
+                "linkedin": request.form.get("linkedin", ""),
+                "portfolio": request.form.get("portfolio", ""),
+                "thesis": request.form.get("thesis", ""),
+                "awards": split_clean(request.form.get("awards")),
+                "volunteering": split_clean(request.form.get("volunteering")),
+                "interests": split_clean(request.form.get("interests")),
+                "other": request.form.get("other", "")
+            }
+        }
+
+        # EXPERIENCE
+        exp_count = int(request.form.get("exp_count", 0))
+        for i in range(exp_count):
+            if request.form.get(f"exp_delete_{i}"):
+                continue
+
+            role = request.form.get(f"exp_role_{i}")
+            company = request.form.get(f"exp_company_{i}")
+            start = request.form.get(f"exp_start_{i}")
+            end = request.form.get(f"exp_end_{i}")
+            desc = request.form.get(f"exp_desc_{i}")
+
+            if any([role, company, start, end, desc]):
+                updated_data["experience"].append({
+                    "role": role or "",
+                    "company": company or "",
+                    "start_date": start or "",
+                    "end_date": end or "",
+                    "description": desc or "",
+                })
+
+        # EDUCATION
+        edu_count = int(request.form.get("edu_count", 0))
+        for i in range(edu_count):
+            if request.form.get(f"edu_delete_{i}"):
+                continue
+
+            degree = request.form.get(f"edu_degree_{i}")
+            institution = request.form.get(f"edu_institution_{i}")
+            year = request.form.get(f"edu_year_{i}")
+
+            if any([degree, institution, year]):
+                updated_data["education"].append({
+                    "degree": degree or "",
+                    "institution": institution or "",
+                    "graduation_year": year or "",
+                })
+
+        profile.ai_cv_data = updated_data
+        db.session.commit()
+
+        return redirect(url_for("onboarding.cv_preview"))
+
+    # Ensure fields exist in CV JSON
+    def ensure_keys(cv):
+        cv = cv or {}
+        cv.setdefault("first_name", "")
+        cv.setdefault("last_name", "")
+        cv.setdefault("email", "")
+        cv.setdefault("phone", "")
+        cv.setdefault("address", "")
+        cv.setdefault("summary", "")
+        cv.setdefault("skills", [])
+        cv.setdefault("job_titles", [])
+        cv.setdefault("experience", [])
+        cv.setdefault("education", [])
+        cv.setdefault("certifications", [])
+        cv.setdefault("languages", [])
+        cv.setdefault("additional_details", {})
+        add = cv["additional_details"]
+        add.setdefault("publications", [])
+        add.setdefault("github", "")
+        add.setdefault("linkedin", "")
+        add.setdefault("portfolio", "")
+        add.setdefault("thesis", "")
+        add.setdefault("awards", [])
+        add.setdefault("volunteering", [])
+        add.setdefault("interests", [])
+        add.setdefault("other", "")
+        return cv
+
+    safe_cv = ensure_keys(profile.ai_cv_data)
+
+    return render_template("cv_edit.html", cv=safe_cv, profile=profile)

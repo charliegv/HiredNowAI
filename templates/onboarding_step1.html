@@ -1,0 +1,151 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="max-w-xl mx-auto bg-white p-8 rounded-xl shadow">
+
+  {% include "components/progress.html" with context %}
+
+  <h1 class="text-2xl font-bold mb-6">Tell us what kind of job you want</h1>
+
+  <form method="POST" class="space-y-6">
+
+    <div>
+      <label class="block text-gray-700 font-medium mb-1">Desired Roles</label>
+      <input type="text" name="job_titles"
+        placeholder="Example Software Engineer, Product Manager"
+        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500"
+        required>
+    </div>
+
+
+
+
+<label class="block text-gray-700 font-medium mb-2">
+  Country
+</label>
+<select name="country"
+        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500"
+        required>
+    <option value="">Select your country</option>
+    <option value="United Kingdom">United Kingdom</option>
+    <option value="United States">United States</option>
+</select>
+
+
+      <label class="block text-gray-700 font-medium mt-4 mb-2">
+  City
+</label>
+
+      <div class="relative">
+    <input
+        type="text"
+        id="cityInput"
+        name="city"
+        placeholder="Start typing your city..."
+        autocomplete="off"
+        class="w-full border border-gray-300 rounded-lg px-4 py-2"
+        required
+    />
+
+    <!-- Suggestions dropdown -->
+    <ul
+        id="citySuggestions"
+        class="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow hidden max-h-60 overflow-y-auto"
+    ></ul>
+</div>
+
+
+    <button
+      class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition">
+      Continue
+    </button>
+
+  </form>
+
+
+    <script>
+document.addEventListener("DOMContentLoaded", () => {
+    const input = document.getElementById("cityInput");
+    const suggestionsBox = document.getElementById("citySuggestions");
+    const countrySelect = document.querySelector("select[name='country']");
+
+    let debounceTimer = null;
+
+    async function searchCities(query, country) {
+        if (!query || query.length < 2) return [];
+
+        const url = `https://nominatim.openstreetmap.org/search?` +
+            new URLSearchParams({
+                q: `${query}, ${country}`,
+                format: "json",
+                addressdetails: 1,
+                limit: 5
+            });
+
+        const res = await fetch(url, {
+            headers: {
+                "User-Agent": "HiredNowAI/1.0"
+            }
+        });
+
+        return res.json();
+    }
+
+    input.addEventListener("input", () => {
+        const query = input.value.trim();
+        const country = countrySelect.value;
+
+        clearTimeout(debounceTimer);
+
+        debounceTimer = setTimeout(async () => {
+            if (!query || !country) {
+                suggestionsBox.classList.add("hidden");
+                return;
+            }
+
+            const results = await searchCities(query, country);
+
+            if (results.length === 0) {
+                suggestionsBox.innerHTML =
+                    `<li class="px-4 py-2 text-gray-500">No matches found</li>`;
+                suggestionsBox.classList.remove("hidden");
+                return;
+            }
+
+            suggestionsBox.innerHTML = "";
+
+            results.forEach(item => {
+                const name = item.display_name;
+                const li = document.createElement("li");
+                li.className = "px-4 py-2 hover:bg-gray-100 cursor-pointer";
+                li.textContent = name;
+
+                li.addEventListener("click", () => {
+                    input.value = item.address.city
+                               || item.address.town
+                               || item.address.village
+                               || item.address.hamlet
+                               || name.split(",")[0];
+
+                    suggestionsBox.classList.add("hidden");
+                });
+
+                suggestionsBox.appendChild(li);
+            });
+
+            suggestionsBox.classList.remove("hidden");
+        }, 300);
+    });
+
+    // Hide suggestions when clicking outside
+    document.addEventListener("click", (e) => {
+        if (!e.target.closest("#citySuggestions") && e.target !== input) {
+            suggestionsBox.classList.add("hidden");
+        }
+    });
+});
+</script>
+
+
+</div>
+{% endblock %}

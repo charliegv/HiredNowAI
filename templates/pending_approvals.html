@@ -1,0 +1,78 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="max-w-5xl mx-auto py-8">
+
+  <!-- Header -->
+  <div class="mb-6">
+    <h1 class="text-3xl font-semibold text-gray-900">
+      Pending Approvals
+    </h1>
+    <p class="text-gray-600 mt-1">
+      Review jobs before HiredNow AI applies on your behalf.
+    </p>
+  </div>
+
+  <!-- If none -->
+  {% if not jobs %}
+    <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 text-center">
+      <p class="text-gray-700 text-lg mb-3">No approvals waiting 🎉</p>
+      <p class="text-gray-500 text-sm">We'll notify you as soon as new matching roles are found.</p>
+
+      <a href="{{ url_for('dashboard.dashboard_home') }}"
+         class="mt-5 inline-block px-5 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition text-sm font-medium">
+        Back to Dashboard
+      </a>
+    </div>
+  {% else %}
+
+    <!-- Approval list -->
+    <div class="space-y-6">
+
+      {% for job in jobs %}
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+
+        <div class="flex items-start justify-between">
+
+          <!-- Job info -->
+          <div>
+            <h2 class="text-xl font-semibold text-gray-900">{{ job.job_title }}</h2>
+            <p class="text-gray-700">{{ job.company }}</p>
+            <p class="text-gray-500 text-sm">{{ job.location }}</p>
+
+            {% if job.salary %}
+              <p class="text-gray-500 text-sm mt-1">Salary: {{ job.salary }}</p>
+            {% endif %}
+          </div>
+
+          <!-- Approve / reject buttons -->
+          <div class="flex flex-col gap-2 items-end">
+
+            <form method="POST" action="{{ url_for('dashboard.approve_pending_application', item_id=job.id) }}">
+              <button class="px-4 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition text-sm">
+                Approve
+              </button>
+            </form>
+
+            <form method="POST" action="{{ url_for('dashboard.reject_application', item_id=job.id) }}">
+              <button class="px-4 py-2 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 transition text-sm">
+                Reject
+              </button>
+            </form>
+
+          </div>
+
+        </div>
+
+        <p class="text-gray-500 text-xs mt-3">Found {{ job.created_at.strftime('%d %b %Y') }}</p>
+      </div>
+      {% endfor %}
+
+    </div>
+
+  {% endif %}
+
+</div>
+
+{% endblock %}

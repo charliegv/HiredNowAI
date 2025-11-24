@@ -1,10 +1,375 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends "layout.html" %}
 
-</body>
-</html>
+{% block content %}
+
+<div class="max-w-6xl mx-auto py-8">
+
+  <!-- Header w/ mode indicators -->
+  <div class="mb-6">
+    <h1 class="text-3xl font-semibold text-gray-900 flex items-center gap-3">
+      Welcome back, {{ current_user.profile.first_name or current_user.email }}
+
+      <!-- Application Mode Chip -->
+      <span class="px-3 py-1 text-xs rounded-full
+        {% if profile.application_mode == 'auto' %}
+          bg-green-100 text-green-700
+        {% else %}
+          bg-yellow-100 text-yellow-700
+        {% endif %}
+      ">
+        {{ profile.application_mode | capitalize }} mode
+      </span>
+
+      <!-- Matching Mode Chip -->
+      <span class="px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-700">
+        {{ profile.match_mode | capitalize }} matching
+      </span>
+    </h1>
+
+    <p class="text-gray-600 mt-1">Here’s what’s happening with your job search.</p>
+  </div>
+
+
+  <!-- TOP ACTION BAR -->
+  <div class="flex flex-wrap gap-3 mb-10">
+
+    <a href="{{ url_for('onboarding.cv_preview') }}"
+       class="px-5 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition text-sm font-medium">
+      View CV
+    </a>
+
+    <a href="{{ url_for('onboarding.edit_cv') }}"
+       class="px-5 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-100 transition text-sm font-medium">
+      Edit CV
+    </a>
+
+    <a href="{{ url_for('preferences.preferences_page') }}"
+       class="px-5 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-100 transition text-sm font-medium">
+      Preferences
+    </a>
+
+    <!-- Only show if approval mode is active -->
+    {% if profile.application_mode == "approval" %}
+    <a href="{{ url_for('dashboard.pending_approvals') }}"
+       class="px-5 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 transition text-sm font-medium">
+      Pending Approvals ({{ stats.pending_approvals or 0 }})
+    </a>
+    {% endif %}
+
+  </div>
+
+
+  <!-- Approval Mode Preview -->
+  {% if profile.application_mode == "approval" %}
+  <div class="bg-white p-6 rounded-xl shadow-sm border border-yellow-200 mb-10">
+    <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+      Preview of approval requests
+      <span class="text-xs text-yellow-600">(visible because approval mode is active)</span>
+    </h3>
+
+    <div class="p-4 border rounded-lg bg-gray-50 flex items-center justify-between">
+
+      <div>
+        <p class="font-medium text-gray-900">Example Job Title</p>
+        <p class="text-gray-600 text-sm">Example Company • Example Location</p>
+        <p class="text-gray-500 text-xs mt-1">
+          Approve to send a tailored CV and application message.
+        </p>
+      </div>
+
+      <div class="flex gap-2">
+        <button class="px-3 py-2 bg-green-600 text-white text-sm rounded-lg shadow hover:bg-green-700 transition">
+          Approve
+        </button>
+        <button class="px-3 py-2 bg-red-600 text-white text-sm rounded-lg shadow hover:bg-red-700 transition">
+          Reject
+        </button>
+      </div>
+
+    </div>
+
+    <p class="text-xs text-gray-500 mt-3">
+      When AI finds roles that match your preferences, they’ll appear here for approval.
+    </p>
+  </div>
+  {% endif %}
+
+
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+
+    <!-- Applications sent -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <p class="text-gray-600 text-sm mb-1">Applications sent</p>
+      <p class="text-3xl font-bold text-gray-900">{{ stats.applications_sent }}</p>
+      <p class="text-sm text-green-600 mt-1">Automation running {{ profile.application_frequency }}</p>
+    </div>
+
+    <!-- Matches found -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <p class="text-gray-600 text-sm mb-1">Matching jobs</p>
+      <p class="text-3xl font-bold text-gray-900">{{ stats.match_count }}</p>
+      <p class="text-sm text-gray-500 mt-1">Based on your preferences</p>
+    </div>
+
+
+  </div>
+
+
+<!-- Application Activity Section -->
+<div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-10">
+
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-xl font-semibold text-gray-900">Application Activity</h2>
+    <a href="{{ url_for('preferences.preferences_page') }}" class="text-primary hover:underline text-sm">
+      Adjust preferences
+    </a>
+  </div>
+
+  {% if activity and activity|length > 0 %}
+  <div class="max-h-96 overflow-y-auto border-t border-gray-200">
+  <table class="w-full text-left">
+
+    <thead>
+      <tr class="text-gray-600 text-sm border-b">
+        <th class="py-2">Job Title</th>
+        <th class="py-2">Company</th>
+        <th class="py-2">Status</th>
+        <th class="py-2">Date</th>
+        <th class="py-2 text-right">Actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for app in activity %}
+      <tr class="border-b hover:bg-gray-50">
+
+<td class="py-3 font-medium text-gray-900 flex items-center gap-2">
+
+  <!-- Job title (clickable) -->
+  <a href="{{ app.job_url }}" target="_blank" rel="noopener noreferrer"
+     class="inline-flex items-center gap-1 group">
+    <span class="text-gray-900">{{ app.job_title }}</span>
+
+    <!-- External link box icon -->
+    <span class="inline-block w-4 h-4 border border-gray-300 rounded-sm flex items-center justify-center text-[10px] group-hover:border-gray-400 transition">
+      ↗
+    </span>
+  </a>
+
+</td>
+
+
+        <!-- Company -->
+        <td class="py-3 text-gray-700">
+          {{ app.company }}
+        </td>
+
+        <!-- Status -->
+        <td class="py-3">
+          {% if app.status == "success" %}
+            <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">Successful</span>
+
+          {% elif app.status == "pending" %}
+            <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">Pending</span>
+
+          {% elif app.status == "failed" %}
+            <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700">Failed</span>
+
+          {% elif app.status == "cancelled" %}
+            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">Cancelled</span>
+          {% endif %}
+        </td>
+
+        <!-- Date -->
+        <td class="py-3 text-gray-600 text-sm">
+          {{ app.created_at.strftime('%d %b %Y') }}
+        </td>
+
+        <!-- Actions -->
+        <td class="py-3 text-right">
+
+          {% if app.status == "success" %}
+
+            <a href="{{ url_for('dashboard.view_cv_variant', app_id=app.id) }}"
+               class="text-blue-600 hover:text-blue-700 text-sm mr-3">
+              View CV Variant
+            </a>
+
+            <a href="{{ url_for('dashboard.view_application_answers', app_id=app.id) }}"
+               class="text-blue-600 hover:text-blue-700 text-sm">
+              View Answers
+            </a>
+
+          {% elif app.status == "pending" %}
+
+            <form method="POST"
+                  class="inline"
+                  action="{{ url_for('dashboard.cancel_application', app_id=app.id) }}">
+              <button class="text-red-600 hover:text-red-700 text-sm">
+                Cancel
+              </button>
+            </form>
+
+          {% elif app.status == "failed" %}
+
+            <form method="POST"
+                  class="inline"
+                  action="{{ url_for('dashboard.retry_application', app_id=app.id) }}">
+              <button class="text-yellow-600 hover:text-yellow-700 text-sm mr-3">
+                Request Retry
+              </button>
+            </form>
+
+            <form method="POST"
+                  class="inline"
+                  action="{{ url_for('dashboard.report_application_issue', app_id=app.id) }}">
+              <button class="text-red-600 hover:text-red-700 text-sm mr-3">
+                Report
+              </button>
+            </form>
+
+            <a href="{{ url_for('dashboard.view_error', app_id=app.id) }}"
+               class="text-gray-600 hover:text-gray-700 text-sm">
+              View Error
+            </a>
+
+          {% endif %}
+
+        </td>
+
+      </tr>
+      {% endfor %}
+    </tbody>
+    </table>
+</div>
+
+
+  {% else %}
+    <p class="text-gray-600">No application activity has been recorded yet. As soon as your automation applies to roles, they will appear here.</p>
+  {% endif %}
+
+</div>
+
+    <!-- Top Matches Section -->
+<div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-10">
+
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-semibold text-gray-900">Top Matches for You</h2>
+        <a href="{{ url_for('preferences.preferences_page') }}" class="text-primary hover:underline text-sm">
+            Improve matching
+        </a>
+    </div>
+
+    {% if matches and matches|length > 0 %}
+    <div class="max-h-96 overflow-y-auto border-t border-gray-200">
+        <table class="w-full text-left">
+
+            <thead>
+                <tr class="text-gray-600 text-sm border-b">
+                    <th class="py-2">Job Title</th>
+                    <th class="py-2">Company</th>
+                    <th class="py-2">Remote</th>
+                    <th class="py-2">Score</th>
+                    <th class="py-2 text-right">Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+{% for m, job_title, company, city, state, country, remote in matches %}
+<tr class="border-b hover:bg-gray-50">
+
+    <!-- Job Title -->
+    <td class="py-3 font-medium text-gray-900">
+        <a href="{{ m.job_url }}" target="_blank" class="group inline-flex items-center gap-1">
+            {{ job_title or "Unknown title" }}
+            <span class="inline-block w-4 h-4 border border-gray-300 rounded-sm
+                         flex items-center justify-center text-[10px]
+                         group-hover:border-gray-400 transition">
+                ↗
+            </span>
+        </a>
+    </td>
+
+    <!-- Company -->
+    <td class="py-3 text-gray-700">
+        {{ company or "Unknown company" }}
+    </td>
+
+    <!-- Location / Remote -->
+    <td class="py-3 text-gray-600 text-sm">
+        {% if remote %}
+            <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">Remote</span>
+        {% else %}
+            {{ city }}, {{ state }}
+        {% endif %}
+    </td>
+
+    <!-- Score -->
+    <td class="py-3 font-semibold text-gray-800">
+        {{ "%.2f"|format(m.score) }}
+    </td>
+
+    <!-- Apply Button -->
+    <td class="py-3 text-right">
+        <form method="POST"
+              action="{{ url_for('dashboard.apply_from_match', match_id=m.id) }}">
+            <button class="text-blue-600 hover:text-blue-700 text-sm">
+                Apply
+            </button>
+        </form>
+    </td>
+
+</tr>
+{% endfor %}
+
+            </tbody>
+
+        </table>
+    </div>
+
+    {% else %}
+        <p class="text-gray-600">No matches found yet. Adjust your preferences to improve matching.</p>
+    {% endif %}
+
+</div>
+
+
+
+
+  <!-- Automation Status -->
+  <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">Application Automation</h2>
+
+    <div class="flex items-center mb-4">
+      <div class="h-3 w-3 rounded-full 
+        {% if automation_running %}
+          bg-green-500
+        {% else %}
+          bg-red-500
+        {% endif %}
+        mr-2"></div>
+
+      <p class="text-gray-700">
+        {% if automation_running %}
+          Automation is active and applying {{ profile.application_frequency }}.
+        {% else %}
+          Automation is currently paused.
+        {% endif %}
+      </p>
+    </div>
+            <div class="text-sm text-gray-600 mt-2">
+        Applying mode: <strong>{{ profile.application_mode }}</strong><br>
+        Matching mode: <strong>{{ profile.match_mode }}</strong>
+      </div>
+      <br>
+
+    <a href="{{ url_for('preferences.preferences_page') }}" 
+       class="text-primary hover:underline text-sm">
+      Change settings
+    </a>
+  </div>
+
+</div>
+
+{% endblock %}

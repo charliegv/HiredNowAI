@@ -1,0 +1,178 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="max-w-4xl mx-auto py-10">
+
+  <a href="{{ url_for('dashboard.dashboard_home') }}"
+     class="text-blue-600 hover:underline text-sm">
+    ← Back to Dashboard
+  </a>
+
+  <div class="bg-white p-10 rounded-xl shadow-md border border-gray-200 mt-6">
+
+    <h1 class="text-3xl font-bold text-gray-900 mb-1">
+      {{ app.cv_variant.first_name }} {{ app.cv_variant.last_name }}
+    </h1>
+
+    <!-- Contact Info -->
+    <p class="text-gray-700 mb-6">
+      {{ app.cv_variant.contact.email }} •
+      {{ app.cv_variant.contact.phone }} •
+      {{ app.cv_variant.contact.location }}
+    </p>
+
+    <!-- Summary -->
+    {% if app.cv_variant.summary %}
+    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-2">Professional Summary</h2>
+    <p class="text-gray-700 leading-relaxed whitespace-pre-line">
+      {{ app.cv_variant.summary }}
+    </p>
+    {% endif %}
+
+    <!-- Skills -->
+    {% if app.cv_variant.skills %}
+    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-2">Skills</h2>
+    <ul class="list-disc ml-6 text-gray-700 space-y-1">
+      {% for skill in app.cv_variant.skills %}
+      <li>{{ skill }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    <!-- Experience -->
+    {% if app.cv_variant.experience %}
+    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-2">Experience</h2>
+    {% for exp in app.cv_variant.experience %}
+    <div class="mt-4">
+      <p class="font-semibold text-gray-900">{{ exp.role }} — {{ exp.company }}</p>
+      <p class="text-sm text-gray-500">{{ exp.start_date }} – {{ exp.end_date }}</p>
+      <p class="text-gray-700 mt-1">{{ exp.description }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Education -->
+    {% if app.cv_variant.education %}
+    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-2">Education</h2>
+    {% for edu in app.cv_variant.education %}
+    <div class="mt-4">
+      <p class="font-semibold text-gray-900">{{ edu.degree }}</p>
+      <p class="text-gray-700">{{ edu.institution }}</p>
+      <p class="text-sm text-gray-500">{{ edu.graduation_year }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Certifications -->
+    {% if app.cv_variant.certifications %}
+    <h2 class="text-xl font-semibold text-gray-900 mt-6 mb-2">Certifications</h2>
+    <ul class="list-disc ml-6 text-gray-700">
+      {% for cert in app.cv_variant.certifications %}
+      <li>{{ cert }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+{% if app.cv_variant.additional_details %}
+<h2 class="text-xl font-semibold text-gray-900 mt-6 mb-2">Additional Details</h2>
+
+<div class="space-y-4">
+
+  <!-- Publications -->
+  {% if app.cv_variant.additional_details.publications and app.cv_variant.additional_details.publications|length > 0 %}
+  <div>
+    <h3 class="font-semibold text-gray-800 text-md">Publications</h3>
+    <ul class="list-disc ml-6 text-gray-700">
+      {% for pub in app.cv_variant.additional_details.publications %}
+        <li>{{ pub }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Awards -->
+  {% if app.cv_variant.additional_details.awards and app.cv_variant.additional_details.awards|length > 0 %}
+  <div>
+    <h3 class="font-semibold text-gray-800 text-md">Awards</h3>
+    <ul class="list-disc ml-6 text-gray-700">
+      {% for award in app.cv_variant.additional_details.awards %}
+        <li>{{ award }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Interests -->
+  {% if app.cv_variant.additional_details.interests and app.cv_variant.additional_details.interests|length > 0 %}
+  <div>
+    <h3 class="font-semibold text-gray-800 text-md">Interests</h3>
+    <ul class="list-disc ml-6 text-gray-700">
+      {% for interest in app.cv_variant.additional_details.interests %}
+        <li>{{ interest }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Volunteering -->
+  {% if app.cv_variant.additional_details.volunteering and app.cv_variant.additional_details.volunteering|length > 0 %}
+  <div>
+    <h3 class="font-semibold text-gray-800 text-md">Volunteering</h3>
+    <ul class="list-disc ml-6 text-gray-700">
+      {% for vol in app.cv_variant.additional_details.volunteering %}
+        <li>{{ vol }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Github -->
+  {% if app.cv_variant.additional_details.github %}
+  <div>
+    <h3 class="font-semibold text-gray-800 text-md">GitHub</h3>
+    <a href="{{ app.cv_variant.additional_details.github }}"
+       class="text-blue-600 hover:underline">
+       {{ app.cv_variant.additional_details.github }}
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- LinkedIn -->
+  {% if app.cv_variant.additional_details.linkedin %}
+  <div>
+    <h3 class="font-semibold text-gray-800 text-md">LinkedIn</h3>
+    <a href="{{ app.cv_variant.additional_details.linkedin }}"
+       class="text-blue-600 hover:underline">
+       {{ app.cv_variant.additional_details.linkedin }}
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Portfolio -->
+  {% if app.cv_variant.additional_details.portfolio %}
+  <div>
+    <h3 class="font-semibold text-gray-800 text-md">Portfolio</h3>
+    <a href="{{ app.cv_variant.additional_details.portfolio }}"
+       class="text-blue-600 hover:underline">
+       {{ app.cv_variant.additional_details.portfolio }}
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Other (if present) -->
+  {% if app.cv_variant.additional_details.other %}
+  <div>
+    <h3 class="font-semibold text-gray-800 text-md">Other Information</h3>
+    <p class="text-gray-700">{{ app.cv_variant.additional_details.other }}</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
+
+  </div>
+</div>
+
+{% endblock %}

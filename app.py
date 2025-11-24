@@ -3,7 +3,10 @@ from config import Config
 from models import db
 from auth import auth
 from dashboard import dashboard
+from onboarding import onboarding
+from profile import preferences
 from flask_login import LoginManager
+
 
 def create_app():
     app = Flask(__name__)
@@ -23,6 +26,8 @@ def create_app():
 
     app.register_blueprint(auth)
     app.register_blueprint(dashboard)
+    app.register_blueprint(preferences)
+    app.register_blueprint(onboarding)
 
     return app
 

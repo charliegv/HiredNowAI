@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="max-w-4xl mx-auto py-8">
+
+  <a href="{{ url_for('dashboard.dashboard_home') }}"
+     class="text-blue-600 hover:underline text-sm">
+    ← Back to Dashboard
+  </a>
+
+  <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mt-4">
+
+    <h1 class="text-2xl font-semibold text-gray-900 mb-4">
+      Application Answers
+    </h1>
+
+    {% if app.application_answers %}
+      <div class="space-y-6">
+
+        {% for key, value in app.application_answers.items() %}
+        <div class="p-4 bg-gray-50 rounded-lg border">
+          <p class="font-medium text-gray-900">{{ key }}</p>
+          <p class="text-gray-700 mt-1 whitespace-pre-wrap">{{ value }}</p>
+        </div>
+        {% endfor %}
+
+      </div>
+    {% else %}
+      <p class="text-gray-600">
+        No application answers were saved for this application.
+      </p>
+    {% endif %}
+
+  </div>
+
+</div>
+
+{% endblock %}

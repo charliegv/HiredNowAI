@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+
+  <h1 class="text-2xl font-bold mb-4">Your Job Matches</h1>
+
+  {% if matches %}
+    <p class="text-gray-600 mb-6">
+      Showing your top {{ matches|length }} matches
+    </p>
+
+    <div class="space-y-4">
+      {% for m in matches %}
+        <div class="border p-4 rounded-lg bg-white shadow-sm">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="font-semibold text-lg">
+                <a href="{{ m.job_url }}" target="_blank" class="text-blue-600 underline">
+                  {{ m.job_url }}
+                </a>
+              </p>
+              <p class="text-sm text-gray-500">
+                Score: {{ "%.3f"|format(m.score) }} |
+                {% if m.is_remote %}
+                  Remote
+                {% else %}
+                  Non Remote
+                {% endif %}
+              </p>
+            </div>
+
+            {% if not automation_running %}
+              <form method="POST" action="{{ url_for('dashboard.select_match', job_url=m.job_url) }}">
+                <button class="bg-green-600 text-white px-4 py-2 rounded-lg">
+                  Apply
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+  {% else %}
+    <p class="text-gray-600">No matches found yet. Check back soon.</p>
+  {% endif %}
+</div>
+{% endblock %}

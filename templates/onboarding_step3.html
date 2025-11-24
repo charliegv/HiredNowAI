@@ -1,0 +1,122 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="max-w-xl mx-auto bg-white p-8 rounded-xl shadow">
+
+  {% include "components/progress.html" with context %}
+
+  <h1 class="text-2xl font-bold mb-4">Choose how often we apply for you</h1>
+
+  <form method="POST" enctype="multipart/form-data" class="space-y-6">
+
+    <!-- Application frequency -->
+    <div>
+      <label class="block text-gray-700 font-medium mb-2">
+        Application frequency
+      </label>
+
+      <select name="application_frequency"
+        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500">
+        <option value="daily">Daily</option>
+        <option value="twice_daily">Twice daily</option>
+        <option value="hourly">Hourly</option>
+      </select>
+    </div>
+
+      <!-- Application Mode -->
+<div>
+  <label class="block text-gray-700 font-medium mb-2">
+    How should HiredNow AI apply for you?
+  </label>
+
+  <select name="application_mode"
+          class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500">
+
+    <option value="auto">Auto-apply (recommended) — We apply automatically on your behalf.</option>
+    <option value="approval">Approval required — You must approve each application first.</option>
+
+  </select>
+</div>
+
+<!-- Matching Strictness -->
+<div>
+  <label class="block text-gray-700 font-medium mb-2">
+    How closely should we match jobs to your CV?
+  </label>
+
+  <select name="match_mode"
+          class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500">
+
+    <option value="safe">Safe mode — Only very close matches to your profile.</option>
+    <option value="standard" selected>Standard mode — Balanced matching.</option>
+    <option value="adventurous">Adventurous mode — Broader, creative role matching.</option>
+
+  </select>
+</div>
+
+
+    <!-- CV Upload -->
+    <div>
+      <label class="block text-gray-700 font-medium mb-2">
+        Upload your CV
+      </label>
+
+      <input
+        type="file"
+        name="cv_file"
+        accept=".pdf,.doc,.docx,.txt"
+        class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-white text-gray-700"
+      />
+
+      {% if profile and profile.cv_location %}
+        <p class="text-xs text-gray-500 mt-1">
+          Current CV: {{ profile.cv_location }}
+        </p>
+      {% endif %}
+    </div>
+
+    <button
+      class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition">
+      Finish and go to your dashboard
+    </button>
+
+  </form>
+
+</div>
+
+
+<div id="cvLoadingModal"
+     class="hidden fixed top-0 left-0 w-screen h-screen flex items-center justify-center bg-black bg-opacity-40 z-[9999]">
+  <div class="bg-white p-8 rounded-xl shadow-xl w-80 text-center">
+
+    <img
+      src="{{ url_for('static', filename='images/cv_anlyse_animation.gif') }}"
+      alt="Analyzing CV animation"
+      class="w-20 h-20 mx-auto mb-4"
+    />
+
+    <h2 class="text-xl font-semibold text-gray-900 mb-2">
+      Analyzing your CV
+    </h2>
+
+    <p class="text-gray-600 text-sm">
+      This usually takes a few seconds…
+    </p>
+  </div>
+</div>
+
+
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.querySelector("form");
+  const modal = document.getElementById("cvLoadingModal");
+
+  form.addEventListener("submit", () => {
+    modal.classList.remove("hidden");
+  });
+});
+</script>
+
+{% endblock %}

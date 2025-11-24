@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@layer components {
+  .btn-pill {
+    @apply px-10 py-3 rounded-full font-semibold shadow-md transition flex items-center justify-center gap-2 cursor-pointer;
+  }
+
+  .btn-orange {
+    @apply bg-orange-400 text-white hover:bg-orange-500 active:scale-95;
+  }
+
+  .btn-blue {
+    @apply bg-blue-600 text-white hover:bg-blue-700 active:scale-95;
+  }
+}

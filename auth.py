@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required
 from flask_bcrypt import Bcrypt
-from models import db, User
+from models import db, User, Profile
 
 auth = Blueprint('auth', __name__)
 bcrypt = Bcrypt()
@@ -18,10 +18,16 @@ def signup():
         db.session.add(user)
         db.session.commit()
 
+        # Create an empty profile linked to the new user
+        profile = Profile(user_id=user.id)
+        db.session.add(profile)
+        db.session.commit()
+
         login_user(user)
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("onboarding.step1"))
 
     return render_template("signup.html")
+
 
 
 @auth.route("/login", methods=["GET", "POST"])
@@ -34,7 +40,7 @@ def login():
 
         if user and bcrypt.check_password_hash(user.password_hash, password):
             login_user(user)
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("dashboard.dashboard_home"))
 
         flash("Invalid credentials", "error")
 

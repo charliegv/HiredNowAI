@@ -1,0 +1,270 @@
+from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask_login import login_required, current_user
+from models import db, Profile, PendingApplication, Application, Match, Job
+from datetime import datetime
+from sqlalchemy import desc
+import hashlib
+
+
+dashboard = Blueprint('dashboard', __name__)
+
+
+@dashboard.route("/")
+@login_required
+def dashboard_home():
+
+    profile = current_user.profile
+
+    # Fetch recent applications
+    activity = Application.query \
+        .filter_by(user_id=current_user.id) \
+        .order_by(Application.created_at.desc()) \
+        .all()
+
+    matches = (
+	    db.session.query(
+		    Match,
+		    Job.title.label("job_title"),
+		    Job.company.label("company"),
+		    Job.city.label("city"),
+		    Job.state.label("state"),
+		    Job.country.label("country"),
+		    Job.is_remote.label("remote_flag")
+	    )
+	    .join(Job, Match.job_id == Job.id)
+	    .filter(Match.user_id == profile.id)
+	    .filter(
+		    ~db.session.query(Application)
+		    .filter(Application.user_id == current_user.id)
+		    .filter(Application.job_url_hash == Match.job_url)
+		    .exists()
+	    )
+	    .order_by(desc(Match.score))
+	    .limit(20)
+	    .all()
+    )
+
+    total_sent = Application.query.filter_by(user_id=current_user.id, status="success").count()
+
+    match_count = Match.query.filter_by(user_id=profile.id).count()
+
+    stats = {
+        "applications_sent": total_sent,
+        "match_count": match_count,
+        "profile_completion": 60
+    }
+
+    automation_running = profile.application_mode == "auto"
+
+    return render_template(
+        "dashboard.html",
+        profile=profile,
+        stats=stats,
+        automation_running=automation_running,
+        activity=activity,
+        matches=matches      # ⭐ SEND MATCHES TO TEMPLATE
+    )
+
+
+@dashboard.route("/pending-approvals", methods=["GET", "POST"])
+@login_required
+def pending_approvals():
+    user_id = current_user.id
+
+    # Fetch only pending items for this user
+    pending = Application.query.filter_by(
+        user_id=current_user.id,
+        status="pending"
+    ).all()
+
+    return render_template(
+        "pending_approvals.html",
+        jobs=pending,
+        profile=current_user.profile
+    )
+
+
+@dashboard.route("/pending-approvals/<int:item_id>/approve", methods=["POST"])
+@login_required
+def approve_pending_application(item_id):
+    item = PendingApplication.query.get_or_404(item_id)
+    item.status = "approved"
+    db.session.commit()
+    flash("Application approved. It will now be submitted automatically.", "success")
+    return redirect(url_for("dashboard.pending_approvals"))
+
+
+@dashboard.route("/pending-approvals/<int:item_id>/reject", methods=["POST"])
+@login_required
+def reject_application(item_id):
+    item = PendingApplication.query.get_or_404(item_id)
+    item.status = "rejected"
+    db.session.commit()
+    flash("Application rejected.", "error")
+    return redirect(url_for("dashboard.pending_approvals"))
+
+@dashboard.route("/application/<int:app_id>/approve", methods=["POST"])
+@login_required
+def approve_application(app_id):
+    app = Application.query.get_or_404(app_id)
+
+    # ensure user owns this item
+    if app.user_id != current_user.id:
+        flash("Unauthorized action.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    app.status = "approved"
+    db.session.commit()
+
+    flash("Application approved. HiredNow AI will now proceed.", "success")
+    return redirect(url_for("dashboard.pending_approvals"))
+
+
+@dashboard.route("/application/<int:app_id>/cancel", methods=["POST"])
+@login_required
+def cancel_application(app_id):
+    app = Application.query.get_or_404(app_id)
+
+    if app.user_id != current_user.id:
+        flash("Unauthorized action.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    app.status = "cancelled"
+    db.session.commit()
+
+    flash("Application has been cancelled.", "success")
+    return redirect(url_for("dashboard.dashboard_home"))
+
+@dashboard.route("/application/<int:app_id>/retry", methods=["POST"])
+@login_required
+def retry_application(app_id):
+    app = Application.query.get_or_404(app_id)
+
+    if app.user_id != current_user.id:
+        flash("Unauthorized action.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    app.status = "pending"
+    app.error_log = None  # clear previous error
+    db.session.commit()
+
+    flash("Retry requested. HiredNow AI will attempt again soon.", "success")
+    return redirect(url_for("dashboard.dashboard_home"))
+
+@dashboard.route("/application/<int:app_id>/report", methods=["POST"])
+@login_required
+def report_application_issue(app_id):
+    app = Application.query.get_or_404(app_id)
+
+    if app.user_id != current_user.id:
+        flash("Unauthorized action.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    # You can expand this to send Slack/email notifications
+    print("Issue reported for application:", app_id)
+
+    flash("Issue reported. We’ll investigate shortly.", "success")
+    return redirect(url_for("dashboard.dashboard_home"))
+
+@dashboard.route("/application/<int:app_id>/error")
+@login_required
+def view_error(app_id):
+    app = Application.query.get_or_404(app_id)
+
+    if app.user_id != current_user.id:
+        flash("Unauthorized action.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    return render_template("application_error.html", app=app)
+
+
+@dashboard.route("/application/<int:app_id>/cv")
+@login_required
+def view_cv_variant(app_id):
+    app = Application.query.get_or_404(app_id)
+
+    if app.user_id != current_user.id:
+        flash("Unauthorized action.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    return render_template("application_cv_variant.html", app=app)
+
+
+@dashboard.route("/application/<int:app_id>/answers")
+@login_required
+def view_application_answers(app_id):
+    app = Application.query.get_or_404(app_id)
+
+    if app.user_id != current_user.id:
+        flash("Unauthorized action.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    return render_template("application_answers.html", app=app)
+
+@dashboard.route("/matches")
+@login_required
+def dashboard_matches():
+
+    matches = Match.query \
+        .filter_by(user_id=current_user.profile.id) \
+        .order_by(Match.score.desc()) \
+        .limit(50) \
+        .all()
+
+
+    return render_template(
+            "matches.html",
+            matches=matches,
+            profile=current_user.profile,
+            automation_running=(current_user.profile.application_mode == "auto")
+        )
+
+
+@dashboard.route("/apply-from-match/<int:match_id>", methods=["POST"])
+@login_required
+def apply_from_match(match_id):
+
+    # Fetch match object
+    match = Match.query.get_or_404(match_id)
+
+    # Ensure this match belongs to the logged-in user (via profile.id)
+    if match.user_id != current_user.profile.id:
+        flash("Unauthorized access.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    # Fetch job details from Job table
+    job = Job.query.get(match.job_id)
+    if not job:
+        flash("Job no longer available.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    # Generate hash for dedupe
+    job_hash = hashlib.sha256(job.job_url.encode()).hexdigest()
+
+    # Check application already exists
+    existing = Application.query.filter_by(
+        user_id=current_user.id,
+        job_url_hash=job_hash
+    ).first()
+
+    if existing:
+        flash("You've already applied to this job.", "info")
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    # Create new application entry
+    new_app = Application(
+        user_id=current_user.id,
+        job_url=job.job_url,
+        job_url_hash=job_hash,
+        job_title=job.title,
+        company=job.company,
+        location=f"{job.city}, {job.state}" if job.city else None,
+        salary=None,
+        status="pending"
+    )
+
+    db.session.add(new_app)
+    db.session.commit()
+
+    flash("AI is now preparing your application…", "success")
+    return redirect(url_for("dashboard.dashboard_home"))
