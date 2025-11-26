@@ -316,6 +316,9 @@ def match_user(conn, user_id: int, limit: int = 200):
     # Store matches, using profile_id as the foreign key value
     with conn.cursor() as cur:
         for score, job in top_matches:
+            if score < 0.20:
+                continue
+
             cur.execute(
                 """
                 INSERT INTO matches (user_id, job_url, job_id, score, is_remote)

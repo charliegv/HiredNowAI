@@ -10,3 +10,7 @@ textract
 docconverter
 beautifulsoup4
 lxml
+playwright
+markdown2
+docx2txt
+aiohttp
