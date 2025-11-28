@@ -167,11 +167,15 @@
 
         <!-- Status -->
         <td class="py-3">
-          {% if app.status == "success" %}
+          {% if app.status == "success" or app.status == "manual_success" %}
             <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">Successful</span>
 
           {% elif app.status == "pending" %}
             <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">Pending</span>
+
+            {% elif app.status == "processing" %}
+            <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">Processing</span>
+
 
           {% elif app.status == "failed" %}
             <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700">Failed</span>
@@ -196,10 +200,11 @@
               View CV Variant
             </a>
 
-            <a href="{{ url_for('dashboard.view_application_answers', app_id=app.id) }}"
-               class="text-blue-600 hover:text-blue-700 text-sm">
-              View Answers
-            </a>
+<a href="{{ url_for('dashboard.view_application_screenshot', app_id=app.id) }}"
+   class="text-blue-600 hover:text-blue-700 text-sm">
+  View Screenshot
+</a>
+
 
           {% elif app.status == "pending" %}
 
@@ -250,6 +255,65 @@
   {% endif %}
 
 </div>
+
+    {% if manual_required and manual_required|length > 0 %}
+<div class="mb-8">
+    <h2 class="text-xl font-semibold mb-3">Manual actions required</h2>
+
+    <div class="space-y-4">
+        {% for app in manual_required %}
+        <div class="p-4 border rounded-lg bg-yellow-50 flex justify-between items-center">
+
+            <div>
+                <div class="font-medium text-gray-800">{{ app.job_title }}</div>
+                <div class="text-sm text-gray-600">{{ app.company }}</div>
+
+                {% if app.error_message %}
+                <div class="text-xs text-gray-500 mt-1">{{ app.error_message }}</div>
+                {% endif %}
+            </div>
+
+<div class="flex items-center space-x-4" id="manual-box-{{ app.id }}">
+
+    {% if app.cv_variant_url %}
+    <a href="{{ url_for('dashboard.view_cv_variant', app_id=app.id) }}"
+        class="text-blue-600 underline text-sm">
+        Download CV
+    </a>
+    {% endif %}
+
+    <!-- Always show Apply Manually button -->
+    <button
+        class="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700"
+        onclick="startManualApply({{ app.id }}, '{{ app.job_url }}')"
+        id="start-btn-{{ app.id }}"
+    >
+        Apply manually now
+    </button>
+
+    <!-- Only show this AFTER user clicks Apply manually now -->
+    {% if app.manual_started %}
+    <button
+        class="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700"
+        onclick="completeManualApply({{ app.id }})"
+        id="complete-btn-{{ app.id }}"
+    >
+        Mark Application Completed
+    </button>
+    {% endif %}
+
+</div>
+
+
+
+
+
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 
     <!-- Top Matches Section -->
 <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-10">
@@ -371,5 +435,65 @@
   </div>
 
 </div>
+
+<script>
+async function startManualApply(appId, jobUrl) {
+    // Open job URL right away
+    window.open(jobUrl, '_blank');
+
+    // Send AJAX request to mark manual_started = true
+    const res = await fetch(`/application/${appId}/manual-start`, {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+        alert("Could not mark manual application as started.");
+        return;
+    }
+
+    // ADD the green button next to the red button (do NOT remove the red one)
+    const box = document.getElementById(`manual-box-${appId}`);
+
+    // Only add if it's not already present
+    if (!document.getElementById(`complete-btn-${appId}`)) {
+        const greenBtn = document.createElement("button");
+        greenBtn.id = `complete-btn-${appId}`;
+        greenBtn.className =
+            "bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700";
+        greenBtn.innerText = "Manual Application Completed";
+        greenBtn.onclick = () => completeManualApply(appId);
+
+        box.appendChild(greenBtn);
+    }
+}
+
+async function completeManualApply(appId) {
+    if (!confirm("Confirm that you have manually completed this application.")) return;
+
+    const res = await fetch(`/application/${appId}/manual-complete`, {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+        alert("Could not mark as completed.");
+        return;
+    }
+
+    // Mark UI however you like — here we simply disable the green button
+    const completeBtn = document.getElementById(`complete-btn-${appId}`);
+    if (completeBtn) {
+        completeBtn.innerText = "Completed ✓";
+        completeBtn.disabled = true;
+        completeBtn.classList.add("opacity-70", "cursor-not-allowed");
+    }
+
+    alert("Application marked as manually completed!");
+}
+</script>
+
 
 {% endblock %}

@@ -11,13 +11,16 @@ import uuid
 # from bots.greenhouse import GreenhouseBot
 from bots.lever import LeverBot
 # from bots.smartrec import SmartRecruitersBot
-# from bots.workable import WorkableBot
+from bots.workable import WorkableBot
 
 from utils.description_parser import html_to_text
 from utils.job_description_fetcher import scrape_job_description
 from utils.cv_builder import generate_custom_cv
 from utils.cv_loader import load_cv_text
 from utils.s3_uploader import upload_to_s3
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 logging.basicConfig(level=logging.INFO, format="[Worker] %(message)s")
@@ -54,9 +57,9 @@ async def load_user_profile(pool, user_id):
 def get_bot(ats_type):
     bots = {
         # "greenhouse": GreenhouseBot(),
-        "lever": LeverBot(),
+        # "lever": LeverBot(),
         # "smartrecruiters": SmartRecruitersBot(),
-        # "workable": WorkableBot(),
+        "workable": WorkableBot(),
     }
     return bots.get(ats_type.lower())
 
@@ -80,33 +83,49 @@ async def download_cv_to_tmp(cv_url: str) -> str:
 
 
 
-async def mark_success(conn, app_id):
-    await conn.execute("""
-        UPDATE applications
-        SET status = 'success', updated_at = now()
-        WHERE id = $1
-    """, app_id)
+async def mark_success(pool, app_id):
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE applications
+            SET status = 'success', updated_at = now()
+            WHERE id = $1
+        """, app_id)
 
 
-async def mark_failed(conn, app_id, error_msg):
-    await conn.execute("""
-        UPDATE applications
-        SET status = 'failed', updated_at = now(), error_message = $2
-        WHERE id = $1
-    """, app_id, error_msg[:500])
+async def mark_failed(pool, app_id, error_msg):
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE applications
+            SET status = 'failed', updated_at = now(), error_message = $2
+            WHERE id = $1
+        """, app_id, error_msg[:500])
 
 
-async def mark_retry(conn, app_id, error_msg):
-    await conn.execute("""
-        UPDATE applications
-        SET status = 'retry', updated_at = now(), error_message = $2
-        WHERE id = $1
-    """, app_id, error_msg[:500])
+async def mark_retry(pool, app_id, error_msg):
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE applications
+            SET status = 'retry', updated_at = now(), error_message = $2
+            WHERE id = $1
+        """, app_id, error_msg[:500])
+
+async def mark_manual_required(pool, app_id, error_msg, cv_url=None):
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE applications
+            SET status = 'manual_required',
+                updated_at = now(),
+                error_message = $2,
+                cv_variant_url = COALESCE($3, cv_variant_url)
+            WHERE id = $1
+        """, app_id, error_msg[:500], cv_url)
+
 
 
 async def worker_loop():
     logging.info("Worker started")
     pool = await get_db()
+    CV_GENERATION_TEST = os.getenv("CV_GENERATION_TEST", "false").lower() == "true"
 
     while True:
         async with pool.acquire() as conn:
@@ -126,17 +145,18 @@ async def worker_loop():
             user = await load_user_profile(conn, user_id)
 
             if not job or not user:
-                await mark_failed(conn, app_id, "Missing job or user profile data")
+                await mark_manual_required(pool, app_id, "Missing job or user profile — manual apply required")
                 continue
 
             ats_type = job.get("source_ats")
             if not ats_type:
-                await mark_failed(conn, app_id, "ATS type missing")
+                await mark_manual_required(pool, app_id, "ATS type Missing — manual apply required")
                 continue
 
             bot = get_bot(ats_type)
             if not bot:
-                await mark_failed(conn, app_id, f"No ATS bot for {ats_type}")
+                # Unsupported ATS → manual apply needed
+                await mark_manual_required(pool, app_id, f"Unsupported ATS: {ats_type}")
                 continue
 
             # 1 - Job description
@@ -146,7 +166,7 @@ async def worker_loop():
                     apply_url = job.get("apply_url") or job.get("job_url") or job.get("url")
 
                     if not apply_url:
-                        await mark_failed(conn, app_id, "No apply_url or job_url found on job")
+                        await mark_failed(pool, app_id, "No apply_url or job_url found on job")
                         continue
 
                     scraped_html = await scrape_job_description(apply_url)
@@ -156,7 +176,7 @@ async def worker_loop():
                     """, scraped_html, job_id)
                     description_html = scraped_html
                 except Exception as e:
-                    await mark_retry(conn, app_id, f"JD scrape failed: {str(e)}")
+                    await mark_manual_required(pool, app_id, f"JD scrape failed: {str(e)}", cv_url=cv_url)
                     continue
 
             job_text = html_to_text(description_html)
@@ -165,7 +185,7 @@ async def worker_loop():
             try:
                 base_cv_text = await load_cv_text(user["cv_location"])
             except Exception as e:
-                await mark_failed(conn, app_id, f"CV load failed: {str(e)}")
+                await mark_manual_required(pool, app_id, "CV load failed — please apply manually", cv_url=None)
                 continue
 
             # 3 - Generate tailored CV
@@ -176,58 +196,90 @@ async def worker_loop():
                     user=user
                 )
             except Exception as e:
-                await mark_retry(conn, app_id, f"CV generation error: {str(e)}")
+                await mark_retry(pool, app_id, f"CV generation error: {str(e)}")
                 continue
 
             # Store JSON variant
             try:
-	            await conn.execute("""
+                await conn.execute("""
                     UPDATE applications
                     SET cv_variant = $1
                     WHERE id = $2
                 """, json.dumps(cv_json), app_id)
             except Exception as e:
-                await mark_failed(conn, app_id, f"Failed saving CV variant JSON: {str(e)}")
+                await mark_failed(pool, app_id, f"Failed saving CV variant JSON: {str(e)}")
                 continue
 
             # 4 - Upload DOCX to S3
             try:
-                cv_url = upload_to_s3(custom_cv_path)
+                cv_url = upload_to_s3(custom_cv_path, folder="cv-variants")
+
+                # Save CV file URL to applications.cv_variant_url
+                await conn.execute("""
+                    UPDATE applications
+                    SET cv_variant_url = $1
+                    WHERE id = $2
+                """, cv_url, app_id)
+                # ---- TEST MODE: stop here ----
+                if CV_GENERATION_TEST:
+                    logging.info("CV_GENERATION_TEST mode enabled - skipping ATS apply step")
+
+                    await conn.execute("""
+                        UPDATE applications
+                        SET status = 'success',
+                            cv_variant_url = $1,
+                            cv_variant = $2,
+                            updated_at = now()
+                        WHERE id = $3
+                    """, cv_url, json.dumps(cv_json), app_id)
+
+                    continue  # Go to next job without applying
+
+
             except Exception as e:
-                await mark_retry(conn, app_id, f"CV upload failed: {str(e)}")
+                await mark_retry(pool, app_id, f"CV upload failed: {str(e)}")
                 continue
 
             # 5 - Apply ONCE
             # 5 - Download S3 CV variant to /tmp
             try:
-	            local_cv_path = await download_cv_to_tmp(cv_url)
+                local_cv_path = await download_cv_to_tmp(cv_url)
             except Exception as e:
-	            await mark_retry(conn, app_id, f"CV download failed: {str(e)}")
-	            continue
+                await mark_retry(pool, app_id, f"CV download failed: {str(e)}")
+                continue
             try:
                 result = await bot.apply(job, user, local_cv_path)
+                logging.info(f"[Worker] Result for {app_id}: {result.status} — {result.message}")
 
                 # Save screenshot URL if bot returned one
                 if hasattr(result, "screenshot_url") and result.screenshot_url:
-                    await conn.execute("""
-                        UPDATE applications
-                        SET screenshot_url = $1
-                        WHERE id = $2
-                    """, result.screenshot_url, app_id)
+                    async with pool.acquire() as conn2:
+                        await conn2.execute("""
+                            UPDATE applications
+                            SET screenshot_url = $1
+                            WHERE id = $2
+                        """, result.screenshot_url, app_id)
 
-                # Then continue with the status handling
                 if result.status == "success":
-                    await mark_success(conn, app_id)
+                    await mark_success(pool, app_id)
 
                 elif result.status == "retry":
-                    await mark_retry(conn, app_id, result.message)
+                    await mark_retry(pool, app_id, result.message)
+
+                elif result.status == "manual_required":
+                    await mark_manual_required(pool, app_id, result.message, cv_url=cv_url)
 
                 else:
-                    await mark_failed(conn, app_id, result.message)
+                    await mark_failed(pool, app_id, result.message)
+
+
 
             except Exception as e:
                 logging.exception(f"Application {app_id} crashed")
-                await mark_retry(conn, app_id, str(e))
+                # If a CV variant exists, send the user to manual apply instead of retry loop
+                await mark_manual_required(pool, app_id, f"Bot crashed: {str(e)}", cv_url=cv_url)
+
+
 
         await asyncio.sleep(1)
 

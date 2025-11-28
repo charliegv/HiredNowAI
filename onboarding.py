@@ -132,9 +132,43 @@ def step3():
         except Exception as e:
             print("Error running initial matching:", e)
 
-        return redirect(url_for("onboarding.edit_cv"))
+        return redirect(url_for("onboarding.step4"))
 
     return render_template("onboarding_step3.html", profile=profile)
+
+
+@onboarding.route("/onboarding/step4", methods=["GET", "POST"])
+@login_required
+def step4():
+    user = current_user
+    profile = Profile.query.filter_by(user_id=user.id).first()
+
+    if request.method == "POST":
+        # Collect form values
+        application_data = {
+            "sponsorship_required": request.form.get("sponsorship_required") == "yes",
+            "work_authorization": request.form.get("work_authorization"),
+            "legally_allowed": request.form.get("legally_allowed") == "yes",
+            "notice_period": request.form.get("notice_period"),
+            "willing_to_relocate": request.form.get("willing_to_relocate") == "yes",
+            "location_preference": request.form.get("location_preference"),
+            "desired_salary": request.form.get("desired_salary"),
+            "years_experience": request.form.get("years_experience"),
+            "highest_education": request.form.get("highest_education"),
+            "gender": request.form.get("gender"),
+            "race": request.form.get("race"),
+            "veteran_status": request.form.get("veteran_status"),
+            "disability_status": request.form.get("disability_status"),
+        }
+
+        profile.application_data = application_data
+        profile.onboarding_application_complete = True
+        db.session.commit()
+
+        # Redirect to success dashboard or next step
+        return redirect(url_for("onboarding.edit_cv"))
+
+    return render_template("onboarding_step4.html", profile=profile)
 
 
 

@@ -16,28 +16,28 @@
       <span class="text-gray-700">First Name</span>
       <input type="text" name="first_name"
              value="{{ cv.first_name or '' }}"
-             class="mt-1 w-full border rounded-lg p-3" />
+             class="mt-1 w-full border rounded-lg p-3" required />
     </label>
 
     <label class="block">
       <span class="text-gray-700">Last Name</span>
       <input type="text" name="last_name"
              value="{{ cv.last_name or '' }}"
-             class="mt-1 w-full border rounded-lg p-3" />
+             class="mt-1 w-full border rounded-lg p-3" required />
     </label>
 
     <label class="block">
       <span class="text-gray-700">Email</span>
       <input type="email" name="email"
              value="{{ cv.email or '' }}"
-             class="mt-1 w-full border rounded-lg p-3" />
+             class="mt-1 w-full border rounded-lg p-3" required />
     </label>
 
     <label class="block">
       <span class="text-gray-700">Phone</span>
       <input type="text" name="phone"
              value="{{ cv.phone or '' }}"
-             class="mt-1 w-full border rounded-lg p-3" />
+             class="mt-1 w-full border rounded-lg p-3" required />
     </label>
 
   </div>

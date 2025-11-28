@@ -3,12 +3,14 @@
 import boto3
 import os
 import uuid
+import mimetypes
 
 
-def upload_to_s3(local_path: str) -> str:
+def upload_to_s3(local_path: str, folder: str) -> str:
     """
-    Uploads a local file to S3 and returns its public URL.
-    Designed for buckets with ACLs disabled (Object Ownership = Bucket Owner Enforced).
+    Uploads any file to S3 under a custom folder.
+    Works with Object Ownership = Bucket Owner Enforced (no ACLs).
+    Infers MIME type automatically.
     """
 
     bucket = os.getenv("AWS_S3_BUCKET")
@@ -24,17 +26,19 @@ def upload_to_s3(local_path: str) -> str:
         region_name=region
     )
 
-    filename = f"cv-variants/{uuid.uuid4()}.docx"
+    # Keep original extension
+    ext = os.path.splitext(local_path)[1] or ""
+    filename = f"{folder}/{uuid.uuid4()}{ext}"
+
+    # Determine content type
+    content_type = mimetypes.guess_type(local_path)[0] or "application/octet-stream"
 
     try:
-        # No ACL here - bucket owner enforced mode forbids ACLs
         s3.upload_file(
             local_path,
             bucket,
             filename,
-            ExtraArgs={
-                "ContentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            }
+            ExtraArgs={"ContentType": content_type}
         )
     except Exception as e:
         raise Exception(f"Failed to upload file to S3: {str(e)}")

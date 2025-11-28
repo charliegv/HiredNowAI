@@ -1,9 +1,11 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import Blueprint, render_template, redirect, url_for, request, flash, send_file, redirect
 from flask_login import login_required, current_user
 from models import db, Profile, PendingApplication, Application, Match, Job
 from datetime import datetime
 from sqlalchemy import desc
 import hashlib
+import requests
+from io import BytesIO
 
 
 dashboard = Blueprint('dashboard', __name__)
@@ -17,9 +19,15 @@ def dashboard_home():
 
     # Fetch recent applications
     activity = Application.query \
-        .filter_by(user_id=current_user.id) \
-        .order_by(Application.created_at.desc()) \
-        .all()
+	    .filter(Application.user_id == current_user.id) \
+	    .filter(Application.status != "manual_required") \
+	    .order_by(Application.created_at.desc()) \
+	    .all()
+
+    manual_required = Application.query \
+	    .filter_by(user_id=current_user.id, status="manual_required") \
+	    .order_by(Application.created_at.desc()) \
+	    .all()
 
     matches = (
 	    db.session.query(
@@ -36,7 +44,7 @@ def dashboard_home():
 	    .filter(
 		    ~db.session.query(Application)
 		    .filter(Application.user_id == current_user.id)
-		    .filter(Application.job_url_hash == Match.job_url)
+		    .filter(Application.job_id == Match.job_id)
 		    .exists()
 	    )
 	    .order_by(desc(Match.score))
@@ -44,7 +52,10 @@ def dashboard_home():
 	    .all()
     )
 
-    total_sent = Application.query.filter_by(user_id=current_user.id, status="success").count()
+    total_sent = Application.query.filter(
+	    Application.user_id == current_user.id,
+	    Application.status.in_(["success", "manual_success"])
+    ).count()
 
     match_count = Match.query.filter_by(user_id=profile.id).count()
 
@@ -62,8 +73,39 @@ def dashboard_home():
         stats=stats,
         automation_running=automation_running,
         activity=activity,
-        matches=matches      # ⭐ SEND MATCHES TO TEMPLATE
+        matches=matches,
+	    manual_required=manual_required
     )
+
+@dashboard.route("/application/<int:app_id>/manual-complete", methods=["POST"])
+@login_required
+def manual_application_complete(app_id):
+    app = Application.query.get_or_404(app_id)
+
+    if app.user_id != current_user.id:
+        return {"success": False, "error": "Unauthorized"}, 403
+
+    app.status = "manual_success"
+    app.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    return {"success": True}
+
+
+
+@dashboard.route("/application/<int:app_id>/manual-start", methods=["POST"])
+@login_required
+def manual_start(app_id):
+    app = Application.query.get_or_404(app_id)
+
+    if app.user_id != current_user.id:
+        return {"success": False, "error": "Unauthorized"}, 403
+
+    app.manual_started = True
+    db.session.commit()
+
+    return {"success": True}
+
 
 
 @dashboard.route("/pending-approvals", methods=["GET", "POST"])
@@ -183,23 +225,54 @@ def view_error(app_id):
 def view_cv_variant(app_id):
     app = Application.query.get_or_404(app_id)
 
+    # Permission check
     if app.user_id != current_user.id:
         flash("Unauthorized action.", "error")
         return redirect(url_for("dashboard.dashboard_home"))
 
-    return render_template("application_cv_variant.html", app=app)
+    # Ensure CV variant exists
+    if not app.cv_variant_url:
+        flash("No CV variant available for this application.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
 
+    # Download file from external storage
+    try:
+        response = requests.get(app.cv_variant_url, timeout=10)
+        response.raise_for_status()
+    except Exception:
+        flash("Could not download CV variant.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
 
-@dashboard.route("/application/<int:app_id>/answers")
+    file_bytes = BytesIO(response.content)
+
+    # Extract filename
+    filename = app.cv_variant_url.split("/")[-1] or "cv_variant.docx"
+
+    # Correct MIME type for .docx
+    mimetype = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+    return send_file(
+        file_bytes,
+        as_attachment=True,
+        download_name=filename,
+        mimetype=mimetype
+    )
+
+@dashboard.route("/application/<int:app_id>/screenshot")
 @login_required
-def view_application_answers(app_id):
+def view_application_screenshot(app_id):
     app = Application.query.get_or_404(app_id)
 
     if app.user_id != current_user.id:
         flash("Unauthorized action.", "error")
         return redirect(url_for("dashboard.dashboard_home"))
 
-    return render_template("application_answers.html", app=app)
+    if not app.screenshot_url:
+        flash("No screenshot available for this application.", "error")
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    return render_template("application_screenshot.html", app=app)
+
 
 @dashboard.route("/matches")
 @login_required
@@ -260,7 +333,8 @@ def apply_from_match(match_id):
         company=job.company,
         location=f"{job.city}, {job.state}" if job.city else None,
         salary=None,
-        status="pending"
+        status="pending",
+	    job_id=job.id,
     )
 
     db.session.add(new_app)

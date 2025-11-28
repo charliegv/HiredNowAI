@@ -51,6 +51,7 @@ class Profile(db.Model):
     cv_templates = db.Column(db.JSON, default=list)
     cover_letter_templates = db.Column(db.JSON, default=list)
     ai_settings = db.Column(db.JSON, default=dict)
+    application_data = db.Column(db.JSON, default=dict)
 
     # Geographical matching (optional but powerful)
     latitude = db.Column(db.Float)     # based on city + state + country
@@ -108,6 +109,7 @@ class Application(db.Model):
     company = db.Column(db.String(255))
     location = db.Column(db.String(255))
     salary = db.Column(db.String(100))
+    cv_variant_url = db.Column(db.String(500))
 
     # application workflow status
     status = db.Column(db.String(50), default="pending")
@@ -118,6 +120,7 @@ class Application(db.Model):
     cv_variant = db.Column(JSON)               # the customized CV used
     application_answers = db.Column(JSON)       # generated answers (if any)
     error_log = db.Column(db.Text)              # if failed
+    screenshot_url = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
@@ -125,6 +128,7 @@ class Application(db.Model):
     job = db.relationship("Job", lazy="joined")
     # convenience relationship
     user = db.relationship("User", backref="applications")
+    manual_started = db.Column(db.Boolean, default=False)
 
     # prevent duplicates for a user+job
     __table_args__ = (
