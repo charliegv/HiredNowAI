@@ -176,7 +176,7 @@ async def worker_loop():
                     """, scraped_html, job_id)
                     description_html = scraped_html
                 except Exception as e:
-                    await mark_manual_required(pool, app_id, f"JD scrape failed: {str(e)}", cv_url=cv_url)
+                    await mark_manual_required(pool, app_id, f"JD scrape failed: {str(e)}", cv_url=None)
                     continue
 
             job_text = html_to_text(description_html)

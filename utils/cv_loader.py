@@ -4,15 +4,38 @@ import os
 import pdfplumber
 import docx
 import docx2txt
+import requests
+import tempfile
 
 
 async def load_cv_text(path: str) -> str:
     """
     Load text content from a CV file.
-    Supports PDF, DOCX, DOC, TXT.
+    Supports:
+    - Local paths
+    - HTTP / HTTPS / S3 URLs
     """
 
-    if not path or not os.path.exists(path):
+    if not path:
+        raise FileNotFoundError("Empty CV path")
+
+    # --- 1. Handle remote URLs ---
+    if path.startswith("http://") or path.startswith("https://"):
+        try:
+            r = requests.get(path, timeout=10)
+            r.raise_for_status()
+        except Exception as e:
+            raise FileNotFoundError(f"Could not download CV from URL: {e}")
+
+        # Save to a temp file
+        ext = os.path.splitext(path)[1].lower() or ".docx"
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+        tmp_file.write(r.content)
+        tmp_file.close()
+        path = tmp_file.name  # Use the downloaded local file
+
+    # --- 2. Validate local file exists ---
+    if not os.path.exists(path):
         raise FileNotFoundError(f"CV file not found: {path}")
 
     ext = os.path.splitext(path)[1].lower()
@@ -49,7 +72,7 @@ async def load_cv_text(path: str) -> str:
         try:
             with open(path, "r", encoding="utf-8") as f:
                 return f.read().strip()
-        except:
+        except Exception:
             raise Exception("Failed to read TXT file")
 
     raise Exception(f"Unsupported CV file type: {ext}")

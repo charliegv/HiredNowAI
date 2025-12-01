@@ -462,7 +462,7 @@ async function startManualApply(appId, jobUrl) {
         greenBtn.id = `complete-btn-${appId}`;
         greenBtn.className =
             "bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700";
-        greenBtn.innerText = "Manual Application Completed";
+        greenBtn.innerText = "Mark Application Completed";
         greenBtn.onclick = () => completeManualApply(appId);
 
         box.appendChild(greenBtn);

@@ -11,10 +11,50 @@ from openai import AsyncOpenAI
 
 from bots.base import BaseATSBot, ApplyResult
 from utils.s3_uploader import upload_to_s3
+from utils.capsolver import CapSolverClient
+import requests
 
 load_dotenv()
 
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+import re
+
+def submit_to_workable_api(job_id, fields, turnstile_token, user_agent, cookies=None):
+    """
+    Submit the application directly to Workable /apply API.
+    Returns (success: bool, response_text)
+    """
+
+    url = f"https://apply.workable.com/api/v1/jobs/{job_id}/apply"
+    payload = { "candidate": fields }
+
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": user_agent,
+        "Origin": "https://apply.workable.com",
+        "Referer": f"https://apply.workable.com/j/{job_id}/apply/",
+        "x-turnstile-token": turnstile_token,
+        "Accept": "application/json, text/plain, */*",
+    }
+
+    # cookies optional — only needed if company enforces them
+    resp = requests.post(url, json=payload, headers=headers, cookies=cookies)
+
+    # Workable uses `201 Created` for success
+    if resp.status_code == 201:
+        return True, resp.text
+
+    return False, resp.text
+
+
+def extract_job_id(url: str) -> str | None:
+    """
+    Extracts the Workable job ID from the job URL.
+    Returns a string such as '2791597AD3', or None if not found.
+    """
+    match = re.search(r"/j/([A-Za-z0-9]+)/", url)
+    return match.group(1) if match else None
 
 
 class WorkableBot(BaseATSBot):
@@ -340,10 +380,258 @@ class WorkableBot(BaseATSBot):
         # Fallback: treat as long
         return False
 
+
+
     # =============================================================
     # Main apply
     # =============================================================
     async def apply(self, job, user, cv_path):
+
+        async def find_turnstile_site_key(page) -> str | None:
+            """
+            Detects and returns the Cloudflare Turnstile site key from the page.
+            Searches visible DOM, hidden DOM, iframes, and script variables.
+            Returns None if not found.
+            """
+
+            # 1) Standard location in DOM
+            loc = page.locator("[data-sitekey]")
+            if await loc.count() > 0:
+                site_key = await loc.first.get_attribute("data-sitekey")
+                if site_key:
+                    return site_key
+
+            # 2) Inside Turnstile iframe
+            iframe = page.frame_locator("iframe[src*='turnstile']")
+            frame_loc = iframe.locator("[data-sitekey]")
+            if await frame_loc.count() > 0:
+                site_key = await frame_loc.first.get_attribute("data-sitekey")
+                if site_key:
+                    return site_key
+
+            # 3) Sometimes Turnstile uses a key named "siteKey" in JavaScript
+            js_probe = await page.evaluate("""
+                () => {
+                    let found = null;
+                    function scan(obj) {
+                        for (const k in obj) {
+                            try {
+                                const v = obj[k];
+                                if (typeof v === "string" && v.startsWith("0x") && v.length > 10) {
+                                    found = v;
+                                    return;
+                                }
+                                if (typeof v === "object" && v !== null) {
+                                    scan(v);
+                                }
+                            } catch {}
+                        }
+                    }
+                    scan(window);
+                    return found;
+                }
+            """)
+            if js_probe and isinstance(js_probe, str):
+                return js_probe
+
+            # 4) As a fallback: inspect shallow inline scripts for a value like "sitekey": "..."
+            script_extract = await page.evaluate("""
+                () => {
+                    let scripts = Array.from(document.scripts).map(s => s.textContent || "");
+                    for (const txt of scripts) {
+                        const match = txt.match(/sitekey["']?\s*[:=]\s*["'](0x[a-zA-Z0-9-_]+)["']/);
+                        if (match) return match[1];
+                    }
+                    return null;
+                }
+            """)
+            if script_extract:
+                return script_extract
+
+            return None
+
+        async def extract_fields(page):
+            """
+            Extract candidate field values from the Workable form.
+            Handles:
+              - text/email/tel/url/textarea (single string)
+              - select (single string)
+              - radio (array)
+              - checkbox (array)
+            Returns a list of {name: str, value: str | list[str]}
+            """
+
+            fields = []
+
+            # TEXT INPUTS + TEXTAREA
+            text_like = page.locator(
+                "input[type='text'], input[type='email'], input[type='tel'], "
+                "input[type='url'], input[type='number'], textarea"
+            )
+            for i in range(await text_like.count()):
+                el = text_like.nth(i)
+                name = await el.get_attribute("name")
+                if not name:
+                    continue
+                if not await el.is_visible():
+                    continue
+
+                value = (await el.input_value()).strip()
+                if value:
+                    fields.append({"name": name, "value": value})
+
+            # SELECT DROPDOWNS
+            selects = page.locator("select")
+            for i in range(await selects.count()):
+                el = selects.nth(i)
+                name = await el.get_attribute("name")
+                if not name:
+                    continue
+
+                # Multi-select vs single
+                is_multi = await el.get_attribute("multiple") is not None
+
+                # single selection
+                if not is_multi:
+                    value = await el.input_value()
+                    if value:
+                        fields.append({"name": name, "value": value})
+                    continue
+
+                # multi selection → array
+                options = el.locator("option:checked")
+                selected = []
+                for j in range(await options.count()):
+                    selected.append(await options.nth(j).get_attribute("value"))
+                if selected:
+                    fields.append({"name": name, "value": selected})
+
+            # RADIO GROUPS → boolean OR array
+            radios = page.locator("input[type='radio']")
+            if await radios.count() > 0:
+                names = set()
+                for i in range(await radios.count()):
+                    name = await radios.nth(i).get_attribute("name")
+                    if name:
+                        names.add(name)
+
+                for name in names:
+                    checked = page.locator(f"input[type='radio'][name='{name}']:checked")
+                    if await checked.count() == 0:
+                        continue
+
+                    value = await checked.first.get_attribute("value")
+
+                    # Case 1: boolean radio ("true" / "false")
+                    if value in ("true", "false"):
+                        fields.append({"name": name, "value": value == "true"})
+                        continue
+
+                    # Case 2: regular multi-choice → array of IDs
+                    fields.append({"name": name, "value": [value]})
+
+            # CHECKBOX GROUPS (multi-select) + GDPR (boolean)
+            # CHECKBOX GROUPS → detect single-choice disguised as checkboxes
+            checkboxes = page.locator("input[type='checkbox']")
+            if await checkboxes.count() > 0:
+
+                # Group by container (Workable uses data-ui="QA_xxxx")
+                containers = page.locator("[data-ui^='QA_']")
+                for c in range(await containers.count()):
+                    container = containers.nth(c)
+                    group_boxes = container.locator("input[type='checkbox']")
+
+                    if await group_boxes.count() == 0:
+                        continue
+
+                    # Check if all are required → Workable "single choice checkbox"
+                    all_required = True
+                    for i in range(await group_boxes.count()):
+                        req = await group_boxes.nth(i).get_attribute("required")
+                        if not req:
+                            all_required = False
+                            break
+
+                    field_name = await container.get_attribute("data-ui")
+
+                    if all_required:
+                        # Single-choice disguised as checkbox group — exactly ONE must be checked.
+                        checked = None
+                        for i in range(await group_boxes.count()):
+                            el = group_boxes.nth(i)
+                            if await el.is_checked():
+                                checked = await el.get_attribute("value") or await el.get_attribute("name")
+                                break
+
+                        # If user didn't check anything, fallback to first checkbox value
+                        if not checked:
+                            checked = await group_boxes.first.get_attribute("value")
+
+                        fields.append({
+                            "name": field_name,
+                            "value": checked
+                        })
+
+                    else:
+                        # REAL multi-select → return array
+                        selected = []
+                        for i in range(await group_boxes.count()):
+                            el = group_boxes.nth(i)
+                            if await el.is_checked():
+                                val = await el.get_attribute("value") or await el.get_attribute("name")
+                                selected.append(val)
+
+                        if selected:
+                            fields.append({
+                                "name": field_name,
+                                "value": selected
+                            })
+
+            # ---- PATCH: Force-capture GDPR consent ----
+            # Look specifically for the standard Workable GDPR checkbox pattern
+            gdpr_box = page.locator("input[type='checkbox'][name='gdpr']")
+            if await gdpr_box.count() > 0:
+                el = gdpr_box.first
+                if await el.is_checked():
+                    fields.append({
+                        "name": "gdpr",
+                        "value": True
+                    })
+
+            return fields
+
+        async def extract_resume(page):
+            """
+            Extract resume metadata (signed S3 URL + file name)
+            Returns dict: { "url": "...", "name": "cv.pdf" }
+            """
+            return await page.evaluate("""
+            () => {
+                // Newer Workable pattern: attribute "data-value"
+                const el = document.querySelector("input[name='resume'], input[data-field='resume']");
+                if (!el) return null;
+
+                // Some versions store JSON in data-value
+                const dv = el.getAttribute("data-value");
+                if (dv) {
+                    try {
+                        const data = JSON.parse(dv);
+                        if (data.url && data.name) return data;
+                    } catch {}
+                }
+
+                // Fallback - value might be JSON string
+                if (el.value) {
+                    try {
+                        const data = JSON.parse(el.value);
+                        if (data.url && data.name) return data;
+                    } catch {}
+                }
+
+                return null;
+            }
+            """)
+
         job_url = (
             job.get("apply_url")
             or job.get("job_url")
@@ -431,7 +719,8 @@ class WorkableBot(BaseATSBot):
                     await self.fill_basic_info(page, ai_data, user)
 
                     # CV
-                    cv_uploaded = await self.upload_cv(page, cv_path)
+                    resume_url = await self.upload_cv(page, cv_path)
+                    cv_uploaded = True if resume_url else False
 
                     # Questions
                     await self.answer_custom_questions(
@@ -443,6 +732,7 @@ class WorkableBot(BaseATSBot):
                         company_name,
                         job_description,
                     )
+                    await self.handle_checkboxes(page)
 
                     # Screenshot after full render
                     screenshot_path = f"/tmp/workable_{user.get('user_id')}_{job.get('id')}.png"
@@ -469,44 +759,87 @@ class WorkableBot(BaseATSBot):
                         )
 
                     submitted = await self.click_submit(page)
+                    await asyncio.sleep(10)
 
-                    if not submitted:
-                        return ApplyResult(
-                            status="retry",
-                            message="Could not click Workable submit button",
-                            screenshot_url=screenshot_url,
-                        )
-
-                    # Quick check for captcha
+                    # Check for captcha
                     try:
-                        captcha_present = (
-                            await page.locator(
-                                "div[id^='turnstile-container']:not([hidden])"
-                            ).count()
-                            > 0
-                        )
+                        locator = page.locator(
+                                    "div[id^='turnstile-container']:not([hidden])"
+                                )
+                        captcha_present = (await locator.count()) > 0
                     except Exception:
                         captcha_present = False
 
+                    fields = await extract_fields(page)
+                    if resume_url:
+                        fields.append({
+                            "name": "resume",
+                            "value": {"url": resume_url, "name": os.path.basename(cv_path)}
+                        })
+                    job_id = extract_job_id(page.url)
                     if captcha_present:
+                        print("Captcha detected")
+
+                        site_key = await page.evaluate("""
+                            () => {
+                                return window?.careers?.config?.turnstileWidgetSiteKey || null;
+                            }
+                        """)
+                        if not site_key:
+                            print("Unable to extract Turnstile site key")
+                            return ApplyResult(status="retry", message="Turnstile site key not found")
+
+                        print(f"Turnstile site key: {site_key}")
+
+                        solver = CapSolverClient()
+                        token = solver.solve_turnstile(website_key=site_key, website_url=page.url)
+
+                        if not token:
+                            print("Captcha solve failed")
+                            return ApplyResult(status="manual_required", message="Captcha solve failed")
+
+                        print(f"Got token ({len(token)} chars)")
+
+                        print(job_id, fields, token, user_agent)
+
+                        ok, resp_body  = submit_to_workable_api(job_id, fields, token, user_agent)
+                        print(resp_body)
+
+
+
+                        if not ok:
+                            return ApplyResult(
+                                status="manual_required",
+                                message=f"API submit failed — requires manual application: {resp_body}",
+                                screenshot_url=screenshot_url,
+                            )
                         return ApplyResult(
-                            status="retry",
-                            message="Turnstile captcha detected on Workable page",
+                            status="success",
+                            message="Workable application submitted via API",
                             screenshot_url=screenshot_url,
                         )
 
                     if not cv_uploaded:
                         return ApplyResult(
-                            status="retry",
-                            message="CV not uploaded on Workable form",
+                            status="failed",
+                            message="Job may be deactivated",
                             screenshot_url=screenshot_url,
                         )
 
+                    success_ui = page.locator("div[data-ui='success'], h1:has-text('Thank')")
+                    if await success_ui.count() > 0:
+                        return ApplyResult(
+                            status="success",
+                            message="Submitted Workable application",
+                            screenshot_url=screenshot_url,
+                        )
                     return ApplyResult(
-                        status="success",
-                        message="Submitted Workable application",
+                        status="manual_required",
+                        message="Error submitting workable application",
                         screenshot_url=screenshot_url,
                     )
+
+
 
                 finally:
                     try:
@@ -563,30 +896,339 @@ class WorkableBot(BaseATSBot):
     # =============================================================
     # Resume upload
     # =============================================================
-    async def upload_cv(self, page, cv_path: str) -> bool:
-        file_input = page.locator("input[data-ui='resume']")
-        if await file_input.count() == 0:
+    async def upload_cv(self, page, cv_path: str) -> str | None:
+        """
+        Upload CV if required. Returns the resume downloadUrl needed for the
+        /apply API request. Returns None if CV not required.
+        """
+
+        # Capture resume S3 upload link
+        resume_download = {"url": None}
+
+        async def on_response(response):
+            if "/form/upload/resume" in response.url:
+                try:
+                    data = await response.json()
+                    resume_download["url"] = data.get("downloadUrl")
+                    if self.debug:
+                        print("[Workable DEBUG] Resume download URL captured:", resume_download["url"])
+                except:
+                    pass
+
+        # Listener must be attached BEFORE upload
+        page.on("response", on_response)
+
+        # Detect resume inputs
+        file_input = page.locator(
+            "input[data-ui='resume'], "
+            "input[type='file'][name*='resume'], "
+            "input[type='file'][id*='resume'], "
+            "input[type='file']"
+        )
+
+        count = await file_input.count()
+        if count == 0:
             if self.debug:
-                print("[Workable DEBUG] Resume input not found")
-            return False
+                print("[Workable DEBUG] No resume upload field detected — skipping.")
+            return None
 
-        locator = file_input.first
-        await locator.scroll_into_view_if_needed()
-        await self.human_sleep(0.4, 1.0)
+        visible_inputs = []
+        for i in range(count):
+            el = file_input.nth(i)
+            if await el.is_visible():
+                visible_inputs.append(el)
 
+        if not visible_inputs:
+            if self.debug:
+                print("[Workable DEBUG] Resume upload exists but not visible — skipping.")
+            return None
+
+        locator = visible_inputs[0]
+
+        # Required check
+        # --- PATCHED REQUIRED DETECTION ---
+        is_required = False
+
+        # 1. Check input attributes
+        required_attr = await locator.get_attribute("required")
+        aria_required = await locator.get_attribute("aria-required")
+        if required_attr is not None or aria_required == "true":
+            is_required = True
+
+        # 2. Check wrapper for required flags
+        wrapper = await locator.evaluate_handle("e => e.closest('[data-role=\"dropzone\"]')")
+        if wrapper:
+            w_req = await wrapper.get_attribute("aria-required")
+            w_req2 = await wrapper.get_attribute("required")
+            if w_req == "true" or w_req2 is not None:
+                is_required = True
+
+        # 3. Check label for a '*' in the question title
         try:
+            label_id = await locator.get_attribute("aria-labelledby")
+            if label_id:
+                label_text = await page.inner_text(f"#{label_id}")
+                if "*" in label_text:
+                    is_required = True
+        except:
+            pass
+
+        if self.debug:
+            print(f"[Workable DEBUG] Resume required detection = {is_required}")
+
+        if self.debug:
+            print(f"[Workable DEBUG] Resume field detected (required={is_required})")
+
+        if not is_required:
             if self.debug:
-                print(f"[Workable DEBUG] Uploading CV from {cv_path}")
+                print("[Workable DEBUG] Resume optional — skipping upload.")
+            return None
+
+        # Perform upload and capture JSON response
+        try:
+            await locator.scroll_into_view_if_needed()
+            await self.human_sleep(0.4, 1.0)
             await locator.set_input_files(cv_path)
-            await self.human_sleep(1.5, 2.5)
-            return True
+            await self.human_sleep(1.2, 2.2)
+
+            # Wait up to 5 seconds for resume_download["url"]
+            for _ in range(50):
+                if resume_download["url"]:
+                    return resume_download["url"]
+                await asyncio.sleep(0.1)
+
+            if self.debug:
+                print("[Workable DEBUG] Upload finished but downloadUrl not captured.")
+            return None
+
         except Exception as e:
             if self.debug:
                 print("[Workable DEBUG] Resume upload failed:", e)
-            return False
-    # =============================================================
-    # Custom questions
-    # =============================================================
+            return None
+
+    async def ask_ai_checkbox_selection(self, question, options):
+        """
+        Returns a list of option labels the AI thinks should be checked.
+        Used for multi-checkbox questions.
+        """
+        # --- Force demographic questions to single-choice ---
+        demographic_keywords = [
+            "ethnicity", "race", "racial", "gender", "sex",
+            "sexual orientation", "orientation",
+            "disability", "disabled",
+            "veteran", "armed forces", "military",
+            "diversity", "equal opportunities"
+        ]
+
+        q = question.lower()
+
+        if any(k in q for k in demographic_keywords):
+            # Choose exactly ONE option using simple AI logic
+            prompt = f"""
+        You MUST choose exactly ONE answer for this question.
+        It is a demographic equal opportunities question.
+
+        QUESTION:
+        {question}
+
+        OPTIONS:
+        {options}
+
+        Return ONLY one label from the options.
+        Return it as a plain string, not a list.
+                """
+
+            try:
+                result = await client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=20,
+                )
+                answer = result.choices[0].message["content"].strip()
+                return [answer]  # return list with ONE element
+            except:
+                return [options[0]]  # fallback to first option
+
+        prompt = f"""
+    The user must answer the following job application question using checkboxes:
+
+    QUESTION:
+    {question}
+
+    OPTIONS:
+    {options}
+
+    Return ONLY the labels that should be checked, based on what will most likely get the application approved.
+    Return as a Python list of strings. For example:
+    ["Yes", "I agree"]
+        """
+
+        try:
+            result = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=50,
+            )
+
+            answer = result.choices[0].message["content"]
+            parsed = json.loads(answer)
+            return parsed if isinstance(parsed, list) else []
+        except:
+            return []
+
+    async def handle_checkboxes(self, page):
+        """
+        Handles all checkbox logic for Workable, including:
+        - Required checkbox groups (single choice)
+        - Regular multi-checkbox groups
+        - GDPR / consent boxes
+        - AI-driven decision selection
+        """
+
+        # 1. Find all high-level checkbox groups
+        checkbox_groups = await page.query_selector_all("div[role='group']")
+
+        for group in checkbox_groups:
+            # Extract the label for the question
+            label_id = await group.get_attribute("aria-labelledby")
+            question_text = ""
+            if label_id:
+                try:
+                    question_text = await page.inner_text(f"#{label_id}")
+                except:
+                    pass
+
+            # Extract all checkbox <input> elements inside the group
+            checkboxes = await group.query_selector_all("input[type='checkbox']")
+            if not checkboxes:
+                continue
+
+            # Build list of checkbox items
+            items = []
+            for cb in checkboxes:
+                wrapper = await cb.evaluate_handle("e => e.closest('[role=checkbox], [data-ui=\"gdpr\"]')")
+                label_el = await cb.evaluate_handle("e => e.closest('label')")
+                label_text = ""
+
+                try:
+                    label_text = await label_el.inner_text()
+                except:
+                    pass
+
+                items.append({
+                    "cb": cb,
+                    "wrapper": wrapper,
+                    "label": (label_text or "").strip()
+                })
+
+            # -------------------------------------------------------------------
+            # 2. Decide if this is a REQUIRED single-choice group
+            # -------------------------------------------------------------------
+            required_count = 0
+            for item in items:
+                req = await item["cb"].get_attribute("required")
+                aria_req = await item["cb"].get_attribute("aria-required")
+                if req is not None or aria_req == "true":
+                    required_count += 1
+
+            # Workable pattern: ALL boxes required => SINGLE CHOICE
+            is_single_choice_required = (required_count == len(items) and len(items) > 1)
+
+            # -------------------------------------------------------------------
+            # 3. Ask AI which labels should be checked
+            # -------------------------------------------------------------------
+            try:
+                ai_answer = await self.ask_ai_checkbox_selection(
+                    question_text,
+                    [i["label"] for i in items]
+                )
+            except:
+                ai_answer = []
+
+            # Normalize AI labels
+            ai_labels = [x.lower() for x in ai_answer if isinstance(x, str)]
+
+            # -------------------------------------------------------------------
+            # 4. APPLY LOGIC
+            # -------------------------------------------------------------------
+
+            if is_single_choice_required:
+                # -------------------------------------------------------------
+                # REQUIRED GROUP - EXACTLY ONE CHECKED
+                # -------------------------------------------------------------
+
+                # If AI produced nothing, choose first option
+                selected_label = None
+                if ai_labels:
+                    selected_label = ai_labels[0]
+                else:
+                    selected_label = items[0]["label"].lower()
+
+                # Enforce single selection
+                for item in items:
+                    label = item["label"].lower()
+                    cb = item["cb"]
+
+                    if label == selected_label:
+                        # Check this one
+                        try:
+                            await cb.check()
+                        except:
+                            if item["wrapper"]:
+                                await item["wrapper"].click()
+                    else:
+                        # Uncheck all others
+                        try:
+                            await cb.uncheck()
+                        except:
+                            pass
+
+                continue
+
+            # -------------------------------------------------------------------
+            # 5. MULTI-SELECT GROUP
+            # -------------------------------------------------------------------
+            for item in items:
+                label = item["label"].lower()
+                cb = item["cb"]
+
+                should_check = False
+
+                # AI wants it
+                if label in ai_labels:
+                    should_check = True
+
+                # If checkbox is required (but not all required, otherwise handled above)
+                req = await cb.get_attribute("required")
+                aria_req = await cb.get_attribute("aria-required")
+                if req is not None or aria_req == "true":
+                    should_check = True
+
+                if should_check:
+                    try:
+                        await cb.check()
+                    except:
+                        if item["wrapper"]:
+                            await item["wrapper"].click()
+                else:
+                    try:
+                        await cb.uncheck()
+                    except:
+                        pass
+
+        # -------------------------------------------------------------------
+        # 6. Catch any remaining orphan checkboxes still required and unchecked
+        # -------------------------------------------------------------------
+        all_required = await page.query_selector_all("input[type='checkbox'][required]")
+        for cb in all_required:
+            if not await cb.is_checked():
+                try:
+                    await cb.check()
+                except:
+                    wrapper = await cb.evaluate_handle("e => e.closest('[role=checkbox], [data-ui=\"gdpr\"]')")
+                    if wrapper:
+                        await wrapper.click()
+
     async def answer_custom_questions(
         self,
         page,
@@ -620,11 +1262,190 @@ class WorkableBot(BaseATSBot):
         for i in range(count):
             block = fields.nth(i)
 
+            # Extract the label
             label_text = await self._extract_label_text(block)
             if not label_text:
                 continue
             label_norm = self._normalise_text(label_text)
 
+            # --------------------------------------------------------------------
+            # 1. Workable custom checkbox & radio groups (MUST BE FIRST)
+            # --------------------------------------------------------------------
+            custom_checkbox = block.locator(
+                "[class*='checkboxOption'], [class*='radioOption']"
+            )
+            if await custom_checkbox.count() > 0:
+                try:
+                    txt = await block.inner_text()
+                    norm = self._normalise_text(txt)
+
+                    should_click = False
+
+                    # Heuristics - always click "agree/yes"
+                    if any(k in norm for k in [
+                        "right to work",
+                        "work in the united kingdom",
+                        "eligible to work",
+                        "work authorisation",
+                        "resident in the uk",
+                        "continuously resident",
+                        "security clear",
+                        "clearable",
+                        "enhanced clearance",
+                        "not aware of any reason",
+                        "pass police",
+                        "national security",
+                        "privacy notice",
+                        "consent",
+                        "i have read",
+                        "i agree",
+                        "i accept",
+                    ]):
+                        should_click = True
+
+                    # Also click ANY required checkbox groups
+                    aria_required = await block.get_attribute("aria-required")
+                    if aria_required == "true":
+                        should_click = True
+
+                    if should_click:
+                        clickable = block.locator("[class*='checkbox'], [class*='radio']")
+                        if await clickable.count() > 0:
+                            await clickable.first.scroll_into_view_if_needed()
+                            await self.human_sleep(0.2, 0.4)
+                            await clickable.first.click()
+                            await self.human_sleep(0.2, 0.4)
+                    continue
+
+                except Exception as e:
+                    if self.debug:
+                        print("[Workable DEBUG] custom checkbox handler error:", e)
+                continue
+
+            # --------------------------------------------------------------------
+            # 1b. Workable new-style radiogroup <fieldset role="radiogroup">
+            # --------------------------------------------------------------------
+            radiogroup = block.locator("fieldset[role='radiogroup']")
+            if await radiogroup.count() > 0:
+                try:
+                    # Extract all radio options
+                    options = radiogroup.locator("div[role='radio']")
+                    option_count = await options.count()
+                    if option_count == 0:
+                        continue
+
+                    # Build list of labels
+                    labels = []
+                    for n in range(option_count):
+                        try:
+                            label_el = options.nth(n).locator("xpath=following-sibling::span[1]")
+                            if await label_el.count() > 0:
+                                labels.append(await label_el.inner_text())
+                            else:
+                                labels.append(None)
+                        except:
+                            labels.append(None)
+
+                    # Decide the answer
+                    desired = None
+
+                    # Try profile mapping (short questions, work auth, availability etc)
+                    direct = self._high_conf_profile_answer(
+                        label_norm,
+                        profile_answers,
+                        ai_data,
+                        user,
+                        current_employer,
+                        short_mode=True,
+                    )
+                    if direct:
+                        desired = direct
+
+                    # Otherwise ask AI
+                    if not desired:
+                        desired = await self._generate_ai_answer(
+                            label_norm,
+                            ai_data,
+                            profile_answers,
+                            job_title,
+                            company_name,
+                            job_description,
+                            short_mode=True,
+                        )
+
+                    desired_norm = self._normalise_text(desired)
+
+                    # Try to click matching option
+                    clicked = False
+                    for idx, lbl in enumerate(labels):
+                        if lbl and desired_norm in self._normalise_text(lbl):
+                            opt = options.nth(idx)
+                            await opt.scroll_into_view_if_needed()
+                            await self.human_sleep(0.2, 0.4)
+                            await opt.click()
+                            clicked = True
+                            break
+
+                    # Fallback: click first radio
+                    if not clicked:
+                        first_opt = options.first
+                        await first_opt.scroll_into_view_if_needed()
+                        await self.human_sleep(0.2, 0.4)
+                        await first_opt.click()
+
+                    continue
+
+                except Exception as e:
+                    if self.debug:
+                        print("[Workable DEBUG] new radiogroup handler error:", e)
+                continue
+            # --------------------------------------------------------------------
+            # 1c. Workable GDPR/consent checkbox <div role="checkbox">
+            # --------------------------------------------------------------------
+            gdpr_checkbox = block.locator("div[role='checkbox']")
+            if await gdpr_checkbox.count() > 0:
+                try:
+                    # Extract the visible text
+                    txt = await block.inner_text()
+                    norm = self._normalise_text(txt)
+
+                    should_click = False
+
+                    # Privacy consent / GDPR always needs to be ticked
+                    if any(k in norm for k in [
+                        "privacy notice",
+                        "gdpr",
+                        "consent",
+                        "i have read",
+                        "i accept",
+                        "i agree",
+                        "processing of my data",
+                        "personal data",
+                        "accept the content",
+                    ]):
+                        should_click = True
+
+                    # Check if required
+                    required_attr = await gdpr_checkbox.first.get_attribute("aria-required")
+                    if required_attr == "true":
+                        should_click = True
+
+                    if should_click:
+                        await gdpr_checkbox.first.scroll_into_view_if_needed()
+                        await self.human_sleep(0.2, 0.4)
+                        await gdpr_checkbox.first.click()
+                        await self.human_sleep(0.2, 0.4)
+
+                    continue
+
+                except Exception as e:
+                    if self.debug:
+                        print("[Workable DEBUG] GDPR checkbox handler error:", e)
+                continue
+
+            # --------------------------------------------------------------------
+            # 2. Standard inputs (textarea, select, input)
+            # --------------------------------------------------------------------
             input_locator = block.locator("textarea, select, input")
             if await input_locator.count() == 0:
                 continue
@@ -650,16 +1471,13 @@ class WorkableBot(BaseATSBot):
             except Exception:
                 pass
 
-            # Skip core identity fields
+            # Skip identity fields
             if data_ui_attr in {"firstname", "lastname", "email", "phone", "resume"}:
                 continue
             if name_attr in {
-                "firstname",
-                "first_name",
-                "lastname",
-                "last_name",
-                "email",
-                "phone",
+                "firstname", "first_name",
+                "lastname", "last_name",
+                "email", "phone",
             }:
                 continue
             if input_type == "email":
@@ -672,25 +1490,28 @@ class WorkableBot(BaseATSBot):
                     f"name={name_attr} required={is_required} short={is_short}"
                 )
 
-            # Deterministic address or location
+            # --------------------------------------------------------------------
+            # 3. Location/address
+            # --------------------------------------------------------------------
             if data_ui_attr == "address" or "address" in label_norm or "location" in label_norm:
                 city = user.get("city") or ""
                 country = user.get("country") or ""
-                addr = ", ".join(x for x in [city, country] if x)
-                if addr:
+                address = ", ".join(x for x in [city, country] if x)
+                if address:
                     try:
                         await input_el.scroll_into_view_if_needed()
                         await self.move_mouse_to_locator(page, input_el)
                         await self.human_sleep(0.2, 0.5)
-                        await self.human_type(input_el, addr)
+                        await self.human_type(input_el, address)
                     except Exception as e:
                         if self.debug:
                             print("[Workable DEBUG] address write error:", e)
                 continue
 
-            # Workable combobox
+            # --------------------------------------------------------------------
+            # 4. Workable combo-box <input role="combobox">
+            # --------------------------------------------------------------------
             if await block.locator("input[role='combobox']").count() > 0:
-                # high confidence mapping for employer or similar
                 direct = self._high_conf_profile_answer(
                     label_norm,
                     profile_answers,
@@ -699,6 +1520,7 @@ class WorkableBot(BaseATSBot):
                     current_employer,
                     short_mode=is_short,
                 )
+
                 if direct is None:
                     desired = await self._generate_ai_answer(
                         label_norm,
@@ -711,28 +1533,24 @@ class WorkableBot(BaseATSBot):
                     )
                 else:
                     desired = direct
+
                 await self.handle_workable_combobox(block, page, desired)
                 continue
 
-            # Salary numeric handling
+            # --------------------------------------------------------------------
+            # 5. Salary inputs
+            # --------------------------------------------------------------------
             is_salary_question = any(
                 kw in label_norm
                 for kw in [
-                    "salary",
-                    "compensation",
-                    "pay range",
-                    "remuneration",
-                    "annual pay",
-                    "expected pay",
-                    "expected earnings",
-                    "ctc",
+                    "salary", "compensation", "pay range", "remuneration",
+                    "annual pay", "expected pay", "expected earnings", "ctc",
                 ]
             )
             if is_salary_question and tag_name == "input" and input_type == "number":
                 raw_sal = profile_answers.get("desired_salary") or ""
-                numeric_sal = self._extract_salary_lower_bound(raw_sal)
-                if not numeric_sal:
-                    numeric_sal = "50000"
+                numeric_sal = self._extract_salary_lower_bound(raw_sal) or "50000"
+
                 try:
                     await input_el.scroll_into_view_if_needed()
                     await self.move_mouse_to_locator(page, input_el)
@@ -743,7 +1561,9 @@ class WorkableBot(BaseATSBot):
                         print("[Workable DEBUG] numeric salary fill error:", e)
                 continue
 
-            # Try high confidence profile mapping for short questions
+            # --------------------------------------------------------------------
+            # 6. Select elements
+            # --------------------------------------------------------------------
             direct_answer = None
             if is_short:
                 direct_answer = self._high_conf_profile_answer(
@@ -755,10 +1575,11 @@ class WorkableBot(BaseATSBot):
                     short_mode=True,
                 )
 
-            # Normal select
             if tag_name == "select":
-                if direct_answer is None:
-                    desired = await self._generate_ai_answer(
+                desired = (
+                    direct_answer
+                    if direct_answer is not None
+                    else await self._generate_ai_answer(
                         label_norm,
                         ai_data,
                         profile_answers,
@@ -767,15 +1588,18 @@ class WorkableBot(BaseATSBot):
                         job_description,
                         short_mode=is_short,
                     )
-                else:
-                    desired = direct_answer
+                )
                 await self._select_option_by_text(block, desired)
                 continue
 
-            # Text and textarea
+            # --------------------------------------------------------------------
+            # 7. Textareas and text inputs
+            # --------------------------------------------------------------------
             if tag_name in {"textarea", "input"} and input_type in {"text", ""}:
-                if direct_answer is None:
-                    answer = await self._generate_ai_answer(
+                answer = (
+                    direct_answer
+                    if direct_answer is not None
+                    else await self._generate_ai_answer(
                         label_norm,
                         ai_data,
                         profile_answers,
@@ -784,8 +1608,7 @@ class WorkableBot(BaseATSBot):
                         job_description,
                         short_mode=is_short,
                     )
-                else:
-                    answer = direct_answer
+                )
                 try:
                     await input_el.scroll_into_view_if_needed()
                     await self.move_mouse_to_locator(page, input_el)
@@ -796,9 +1619,13 @@ class WorkableBot(BaseATSBot):
                         print("[Workable DEBUG] text answer fill error:", e)
                 continue
 
-            # Required radio or checkbox as last fallback
+            # --------------------------------------------------------------------
+            # 8. Native radio/checkbox fallback (rare on Workable)
+            # --------------------------------------------------------------------
             if is_required and input_type in {"radio", "checkbox"}:
                 await self._handle_yes_no_radio(block, value=True)
+
+
 
     # =============================================================
     # High confidence profile mapping for short questions
@@ -862,24 +1689,39 @@ class WorkableBot(BaseATSBot):
     # =============================================================
     async def handle_workable_combobox(self, block, page, desired_text):
         try:
-            combobox = block.locator("input[role='combobox']")
-            if await combobox.count() == 0:
+            # find the wrapper that actually opens the dropdown
+            wrapper = block.locator("[data-input-type='select'], [data-ui][data-input-type='select']")
+            if await wrapper.count() == 0:
+                wrapper = block
+
+            # find the visible combobox
+            combo = wrapper.locator("input[role='combobox']")
+            if await combo.count() == 0:
                 return False
-            cb = combobox.first
-            await cb.scroll_into_view_if_needed()
-            await self.human_sleep(0.2, 0.5)
-            await cb.click()
+            combo = combo.first
+
+            await combo.scroll_into_view_if_needed()
             await self.human_sleep(0.3, 0.5)
 
-            listbox = page.locator("div[role='listbox']")
-            await listbox.wait_for(state="visible", timeout=6000)
-            options = listbox.locator("[role='option']")
+            # click the container not the input
+            await wrapper.click()
+            await self.human_sleep(0.4, 0.7)
+
+            # New Workable listbox
+            listbox = page.locator(
+                "[role='listbox'], div[data-ui='listbox'], div[role='option-list']"
+            )
+
+            await listbox.wait_for(state="visible", timeout=5000)
+
+            options = listbox.locator("[role='option'], div[data-ui='option']")
             count = await options.count()
             if count == 0:
                 return False
 
             desired_norm = self._normalise_text(desired_text or "")
 
+            # First try match
             for i in range(count):
                 txt = await options.nth(i).inner_text()
                 if desired_norm and desired_norm in self._normalise_text(txt):
@@ -887,12 +1729,14 @@ class WorkableBot(BaseATSBot):
                     await self.human_sleep(0.3, 0.6)
                     return True
 
+            # fallback: choose first option
             await options.first.click()
             await self.human_sleep(0.3, 0.6)
             return True
+
         except Exception as e:
             if self.debug:
-                print("[Workable DEBUG] combobox handler error:", e)
+                print("[Workable DEBUG] NEW dropdown handler error:", e)
             return False
 
     # =============================================================

@@ -8,6 +8,7 @@ from utils.geocode import geocode_city
 from matching import match_user
 import psycopg2
 import os
+from utils.s3_uploader import upload_to_s3
 
 onboarding = Blueprint("onboarding", __name__)
 
@@ -51,7 +52,7 @@ def step1():
         db.session.commit()
         return redirect(url_for("onboarding.step2"))
 
-    return render_template("onboarding_step1.html", step=1, progress=33)
+    return render_template("onboarding_step1.html", step=1, progress=25)
 
 
 
@@ -81,7 +82,7 @@ def step2():
     if not profile.job_titles or not profile.city:
         return redirect(url_for("onboarding.step1"))
 
-    return render_template("onboarding_step2.html", step=2, progress=66)
+    return render_template("onboarding_step2.html", step=2, progress=50)
 
 
 
@@ -111,7 +112,11 @@ def step3():
             cv_path = os.path.join(user_folder, filename)
             file.save(cv_path)
 
-            profile.cv_location = cv_path
+            # Upload to S3
+            s3_url = upload_to_s3(cv_path, folder=f"user-cvs/{current_user.id}")
+
+            # Save remote URL
+            profile.cv_location = s3_url
 
             # Extract + AI parse
             raw_text = extract_cv_text(cv_path)
@@ -134,7 +139,7 @@ def step3():
 
         return redirect(url_for("onboarding.step4"))
 
-    return render_template("onboarding_step3.html", profile=profile)
+    return render_template("onboarding_step3.html", profile=profile, step=3, progress=75)
 
 
 @onboarding.route("/onboarding/step4", methods=["GET", "POST"])
@@ -168,7 +173,7 @@ def step4():
         # Redirect to success dashboard or next step
         return redirect(url_for("onboarding.edit_cv"))
 
-    return render_template("onboarding_step4.html", profile=profile)
+    return render_template("onboarding_step4.html", profile=profile, step=4, progress=100)
 
 
 

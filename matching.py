@@ -331,7 +331,7 @@ def match_user(conn, user_id: int, limit: int = 200):
                     matched_at = NOW()
                 """,
                 (
-                    profile["profile_id"],
+                    profile["user_id"],
                     job["job_url"],
                     job["id"],
                     score,

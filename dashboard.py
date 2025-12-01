@@ -40,7 +40,7 @@ def dashboard_home():
 		    Job.is_remote.label("remote_flag")
 	    )
 	    .join(Job, Match.job_id == Job.id)
-	    .filter(Match.user_id == profile.id)
+	    .filter(Match.user_id == current_user.id)
 	    .filter(
 		    ~db.session.query(Application)
 		    .filter(Application.user_id == current_user.id)
@@ -57,7 +57,7 @@ def dashboard_home():
 	    Application.status.in_(["success", "manual_success"])
     ).count()
 
-    match_count = Match.query.filter_by(user_id=profile.id).count()
+    match_count = Match.query.filter_by(user_id=current_user.id).count()
 
     stats = {
         "applications_sent": total_sent,
@@ -279,7 +279,7 @@ def view_application_screenshot(app_id):
 def dashboard_matches():
 
     matches = Match.query \
-        .filter_by(user_id=current_user.profile.id) \
+        .filter_by(user_id=current_user.id) \
         .order_by(Match.score.desc()) \
         .limit(50) \
         .all()
@@ -301,7 +301,7 @@ def apply_from_match(match_id):
     match = Match.query.get_or_404(match_id)
 
     # Ensure this match belongs to the logged-in user (via profile.id)
-    if match.user_id != current_user.profile.id:
+    if match.user_id != current_user.id:
         flash("Unauthorized access.", "error")
         return redirect(url_for("dashboard.dashboard_home"))
 
