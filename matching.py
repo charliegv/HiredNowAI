@@ -237,7 +237,7 @@ def match_user(conn, user_id: int, limit: int = 200):
                 posted_at
             FROM jobs
             WHERE (country = %s OR is_remote = true)
-              AND posted_at >= NOW() - INTERVAL '60 days'
+              AND expires_at >= NOW()
             """,
             (profile["country"],),
         )

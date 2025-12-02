@@ -598,6 +598,82 @@ class WorkableBot(BaseATSBot):
                         "value": True
                     })
 
+            # ----- NEW: capture hidden Workable value inputs -----
+            hidden = page.locator(
+                "form[data-ui='application-form'] input[type='hidden'][name][value]"
+            )
+            for i in range(await hidden.count()):
+                el = hidden.nth(i)
+                name = await el.get_attribute("name")
+                value = await el.get_attribute("value")
+
+                # Skip resume (already handled)
+                if name in {"resume", "csrf", "causal_token"}:
+                    continue
+
+                # Add only if not already in fields
+                if name and value and not any(f["name"] == name for f in fields):
+                    fields.append({"name": name, "value": value})
+
+            # ----- Workable "fake hidden" inputs for combo values -----
+            backend_inputs = page.locator(
+                "form[data-ui='application-form'] input[name][value]"
+                ":not([type='file']):not([type='checkbox']):not([type='radio'])"
+            )
+
+            for i in range(await backend_inputs.count()):
+                el = backend_inputs.nth(i)
+
+                name = await el.get_attribute("name")
+                value = await el.get_attribute("value")
+
+                if not name or not value:
+                    continue
+
+                # Skip fields we explicitly handle elsewhere
+                if name in {"resume", "csrf", "causal_token"}:
+                    continue
+
+                # CRITICAL CHANGE:
+                # Do NOT skip visible elements — Workable combo values are "visible" to Playwright
+                # even though they are logically hidden.
+
+                # Don't overwrite existing fields
+                if not any(f["name"] == name for f in fields):
+                    fields.append({"name": name, "value": value})
+
+            # ----- Safe numeric conversion for QA fields only -----
+            for field in fields:
+                name = field["name"]
+                value = field["value"]
+
+                # Convert only QA_xxxxx fields that are not arrays and not booleans
+                if not name.startswith("QA_"):
+                    continue
+                if not isinstance(value, str):
+                    continue
+
+                v = value.replace(",", "").strip()
+
+                # Skip values that are obviously phone-like or date-like
+                if len(v) > 8 and v.isdigit():
+                    # Prevent converting long numbers like phone numbers
+                    continue
+
+                # Now check if this QA answer is numeric
+                if v.isdigit():
+                    field["value"] = int(v)
+                else:
+                    # Try float if allowed
+                    try:
+                        f = float(v)
+                        if f.is_integer():
+                            field["value"] = int(f)
+                        else:
+                            field["value"] = f
+                    except:
+                        pass
+
             return fields
 
         async def extract_resume(page):
@@ -915,47 +991,57 @@ class WorkableBot(BaseATSBot):
                 except:
                     pass
 
-        # Listener must be attached BEFORE upload
+        # Listener MUST be attached before upload
         page.on("response", on_response)
 
-        # Detect resume inputs
-        file_input = page.locator(
-            "input[data-ui='resume'], "
-            "input[type='file'][name*='resume'], "
-            "input[type='file'][id*='resume'], "
-            "input[type='file']"
-        )
-
-        count = await file_input.count()
+        # --- STEP 1: Find ALL visible file inputs ---
+        all_file_inputs = page.locator("input[type='file']")
+        count = await all_file_inputs.count()
         if count == 0:
             if self.debug:
-                print("[Workable DEBUG] No resume upload field detected — skipping.")
+                print("[Workable DEBUG] No file inputs found — skipping.")
             return None
 
-        visible_inputs = []
+        # --- STEP 2: Identify ONLY resume inputs based on accepted formats ---
+        resume_inputs = []
         for i in range(count):
-            el = file_input.nth(i)
-            if await el.is_visible():
-                visible_inputs.append(el)
+            el = all_file_inputs.nth(i)
 
-        if not visible_inputs:
+            if not await el.is_visible():
+                continue
+
+            accept_attr = (await el.get_attribute("accept") or "").lower()
+
+            # Resume file types
+            is_resume = any(t in accept_attr for t in ["pdf", "doc", "docx", "rtf", "odt"])
+            # Image/photo file types
+            is_image = any(t in accept_attr for t in ["jpg", "jpeg", "png", "gif", "image/"])
+
+            # We want ONLY document upload fields
+            if is_resume and not is_image:
+                resume_inputs.append(el)
+
+        if not resume_inputs:
             if self.debug:
-                print("[Workable DEBUG] Resume upload exists but not visible — skipping.")
+                print("[Workable DEBUG] No resume input detected — found only PHOTO upload fields.")
             return None
 
-        locator = visible_inputs[0]
+        # Use the first valid resume input
+        locator = resume_inputs[0]
 
-        # Required check
-        # --- PATCHED REQUIRED DETECTION ---
-        is_required = False
+        if self.debug:
+            print("[Workable DEBUG] Using resume input with accept=", await locator.get_attribute("accept"))
 
-        # 1. Check input attributes
+        # --- STEP 3: Required detection ---
+        is_required = True
+
+        # 1. Input attributes
         required_attr = await locator.get_attribute("required")
         aria_required = await locator.get_attribute("aria-required")
         if required_attr is not None or aria_required == "true":
             is_required = True
 
-        # 2. Check wrapper for required flags
+        # 2. Wrapper element
         wrapper = await locator.evaluate_handle("e => e.closest('[data-role=\"dropzone\"]')")
         if wrapper:
             w_req = await wrapper.get_attribute("aria-required")
@@ -963,7 +1049,7 @@ class WorkableBot(BaseATSBot):
             if w_req == "true" or w_req2 is not None:
                 is_required = True
 
-        # 3. Check label for a '*' in the question title
+        # 3. Label contains a '*'
         try:
             label_id = await locator.get_attribute("aria-labelledby")
             if label_id:
@@ -974,24 +1060,21 @@ class WorkableBot(BaseATSBot):
             pass
 
         if self.debug:
-            print(f"[Workable DEBUG] Resume required detection = {is_required}")
-
-        if self.debug:
-            print(f"[Workable DEBUG] Resume field detected (required={is_required})")
+            print(f"[Workable DEBUG] Resume required = {is_required}")
 
         if not is_required:
             if self.debug:
                 print("[Workable DEBUG] Resume optional — skipping upload.")
             return None
 
-        # Perform upload and capture JSON response
+        # --- STEP 4: Perform upload ---
         try:
             await locator.scroll_into_view_if_needed()
             await self.human_sleep(0.4, 1.0)
             await locator.set_input_files(cv_path)
             await self.human_sleep(1.2, 2.2)
 
-            # Wait up to 5 seconds for resume_download["url"]
+            # Wait for Workable to respond with downloadUrl
             for _ in range(50):
                 if resume_download["url"]:
                     return resume_download["url"]
@@ -999,6 +1082,7 @@ class WorkableBot(BaseATSBot):
 
             if self.debug:
                 print("[Workable DEBUG] Upload finished but downloadUrl not captured.")
+
             return None
 
         except Exception as e:
@@ -1443,6 +1527,38 @@ class WorkableBot(BaseATSBot):
                         print("[Workable DEBUG] GDPR checkbox handler error:", e)
                 continue
 
+            # --- NEW: force-detect Workable special dropdowns before standard inputs ---
+            combo_input = block.locator("input[role='combobox']")
+            if await combo_input.count() > 0:
+                # Extract profile or AI answer
+                direct = self._high_conf_profile_answer(
+                    label_norm,
+                    profile_answers,
+                    ai_data,
+                    user,
+                    current_employer,
+                    short_mode=is_short,
+                )
+
+                if direct is None:
+                    desired = await self._generate_ai_answer(
+                        label_norm,
+                        ai_data,
+                        profile_answers,
+                        job_title,
+                        company_name,
+                        job_description,
+                        short_mode=is_short,
+                    )
+                else:
+                    desired = direct
+
+                if self.debug:
+                    print(f"[Workable DEBUG] Combo detected: '{label_text}' => '{desired}'")
+
+                await self.handle_workable_combobox(block, page, desired)
+                continue
+
             # --------------------------------------------------------------------
             # 2. Standard inputs (textarea, select, input)
             # --------------------------------------------------------------------
@@ -1689,30 +1805,34 @@ class WorkableBot(BaseATSBot):
     # =============================================================
     async def handle_workable_combobox(self, block, page, desired_text):
         try:
-            # find the wrapper that actually opens the dropdown
+            # Wrapper that opens the dropdown
             wrapper = block.locator("[data-input-type='select'], [data-ui][data-input-type='select']")
             if await wrapper.count() == 0:
                 wrapper = block
 
-            # find the visible combobox
-            combo = wrapper.locator("input[role='combobox']")
-            if await combo.count() == 0:
-                return False
-            combo = combo.first
-
+            # Combo input
+            combo = wrapper.locator("input[role='combobox']").first
             await combo.scroll_into_view_if_needed()
             await self.human_sleep(0.3, 0.5)
 
-            # click the container not the input
+            # open dropdown
             await wrapper.click()
             await self.human_sleep(0.4, 0.7)
 
-            # New Workable listbox
-            listbox = page.locator(
+            # --- FIX: restrict listbox search to this block ONLY ---
+            listbox = block.locator(
                 "[role='listbox'], div[data-ui='listbox'], div[role='option-list']"
             )
 
-            await listbox.wait_for(state="visible", timeout=5000)
+            # fallback if Workable renders listbox outside block
+            if await listbox.count() == 0:
+                # find the *closest active* listbox near the combo
+                listbox = page.locator(
+                    f"#{await combo.get_attribute('aria-controls')}"
+                )
+
+            # wait only for THIS listbox
+            await listbox.first.wait_for(state="visible", timeout=5000)
 
             options = listbox.locator("[role='option'], div[data-ui='option']")
             count = await options.count()
@@ -1721,7 +1841,7 @@ class WorkableBot(BaseATSBot):
 
             desired_norm = self._normalise_text(desired_text or "")
 
-            # First try match
+            # Try match
             for i in range(count):
                 txt = await options.nth(i).inner_text()
                 if desired_norm and desired_norm in self._normalise_text(txt):
@@ -1729,7 +1849,7 @@ class WorkableBot(BaseATSBot):
                     await self.human_sleep(0.3, 0.6)
                     return True
 
-            # fallback: choose first option
+            # fallback to first visible
             await options.first.click()
             await self.human_sleep(0.3, 0.6)
             return True

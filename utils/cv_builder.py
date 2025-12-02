@@ -6,9 +6,27 @@ import os
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+import random
+import re
 
 
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
+
+def generate_cv_filename(first_name, last_name, ext="docx"):
+    # Normalize
+    fn = (first_name or "").strip().lower()
+    ln = (last_name or "").strip().lower()
+
+    # Replace spaces with underscores
+    fn = re.sub(r"\W+", "_", fn)
+    ln = re.sub(r"\W+", "_", ln)
+
+    # Random 6-digit number
+    rand = random.randint(100000, 999999)
+
+    return f"{fn}_{ln}_{rand}.{ext}"
 
 
 def build_docx_from_json(cv_json):
@@ -146,7 +164,10 @@ async def generate_custom_cv(base_cv_text, job_text, user):
     # Build DOCX
     doc = build_docx_from_json(cv_json)
 
-    tmp_path = tempfile.mktemp(suffix=".docx")
+    filename = generate_cv_filename(cv_json["first_name"], cv_json["last_name"])
+    tmp_dir = tempfile.gettempdir()
+    tmp_path = os.path.join(tmp_dir, filename)
+
     doc.save(tmp_path)
 
-    return cv_json, tmp_path
+    return cv_json, tmp_path, filename

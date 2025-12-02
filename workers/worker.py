@@ -190,7 +190,7 @@ async def worker_loop():
 
             # 3 - Generate tailored CV
             try:
-                cv_json, custom_cv_path = await generate_custom_cv(
+                cv_json, custom_cv_path, custom_cv_name = await generate_custom_cv(
                     base_cv_text=base_cv_text,
                     job_text=job_text,
                     user=user
@@ -212,7 +212,7 @@ async def worker_loop():
 
             # 4 - Upload DOCX to S3
             try:
-                cv_url = upload_to_s3(custom_cv_path, folder="cv-variants")
+                cv_url = upload_to_s3(custom_cv_path, folder="cv-variants", custom_filename=custom_cv_name)
 
                 # Save CV file URL to applications.cv_variant_url
                 await conn.execute("""

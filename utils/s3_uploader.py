@@ -6,11 +6,11 @@ import uuid
 import mimetypes
 
 
-def upload_to_s3(local_path: str, folder: str) -> str:
+def upload_to_s3(local_path: str, folder: str, custom_filename: str | None = None) -> str:
     """
     Uploads any file to S3 under a custom folder.
-    Works with Object Ownership = Bucket Owner Enforced (no ACLs).
-    Infers MIME type automatically.
+    - If custom_filename is provided, it is used as the object key.
+    - Uses UUID fallback otherwise.
     """
 
     bucket = os.getenv("AWS_S3_BUCKET")
@@ -26,21 +26,22 @@ def upload_to_s3(local_path: str, folder: str) -> str:
         region_name=region
     )
 
-    # Keep original extension
     ext = os.path.splitext(local_path)[1] or ""
-    filename = f"{folder}/{uuid.uuid4()}{ext}"
 
-    # Determine content type
+    # If you provided a filename, use it — else fallback to UUID
+    if custom_filename:
+        filename = f"{folder}/{custom_filename}"
+    else:
+        filename = f"{folder}/{uuid.uuid4()}{ext}"
+
+    # Infer content type
     content_type = mimetypes.guess_type(local_path)[0] or "application/octet-stream"
 
-    try:
-        s3.upload_file(
-            local_path,
-            bucket,
-            filename,
-            ExtraArgs={"ContentType": content_type}
-        )
-    except Exception as e:
-        raise Exception(f"Failed to upload file to S3: {str(e)}")
+    s3.upload_file(
+        local_path,
+        bucket,
+        filename,
+        ExtraArgs={"ContentType": content_type}
+    )
 
     return f"https://{bucket}.s3.{region}.amazonaws.com/{filename}"

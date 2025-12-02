@@ -9,6 +9,7 @@ from matching import match_user
 import psycopg2
 import os
 from utils.s3_uploader import upload_to_s3
+from utils.background import run_async
 
 onboarding = Blueprint("onboarding", __name__)
 
@@ -56,7 +57,6 @@ def step1():
 
 
 
-# =========================================================
 # STEP 2 — Salary + Remote Preference
 # =========================================================
 @onboarding.route("/onboarding/step2", methods=["GET", "POST"])
@@ -64,11 +64,15 @@ def step1():
 def step2():
     profile = get_or_create_profile()
 
+    # Prevent skipping step 1 (must be *before* POST logic returns)
+    if not profile.job_titles or not profile.city:
+        return redirect(url_for("onboarding.step1"))
+
     if request.method == "POST":
         profile.min_salary = request.form["min_salary"]
         profile.remote_preference = "remote_preference" in request.form
 
-        # Optional miles filter (if included in form)
+        # Optional miles filter
         if "miles_distance" in request.form:
             try:
                 profile.miles_distance = int(request.form["miles_distance"])
@@ -76,14 +80,29 @@ def step2():
                 profile.miles_distance = None
 
         db.session.commit()
+
+        # -----------------------------------------------------
+        # FIRE ASYNC MATCHING IMMEDIATELY (non blocking)
+        # -----------------------------------------------------
+        try:
+            user_id = current_user.id  # capture before thread
+
+            def run_match():
+                conn = psycopg2.connect(os.environ["DATABASE_URL"])
+                match_user(conn, user_id)
+                conn.close()
+
+            run_async(run_match)
+            print(f"[MATCH] Async matching triggered for user {user_id}")
+
+        except Exception as e:
+            print("Error triggering matching thread:", e)
+
+        # Redirect instantly, do not wait for matching
         return redirect(url_for("onboarding.step3"))
 
-    # Prevent skipping step 1
-    if not profile.job_titles or not profile.city:
-        return redirect(url_for("onboarding.step1"))
-
+    # GET request
     return render_template("onboarding_step2.html", step=2, progress=50)
-
 
 
 # =========================================================
@@ -126,16 +145,6 @@ def step3():
         # Mark onboarding complete
         profile.onboarding_complete = True
         db.session.commit()
-
-        # ==================================================
-        # Only run matching AFTER onboarding is 100 percent complete
-        # ==================================================
-        try:
-            print(f"[MATCH] Running initial matching for User.id={current_user.id} Profile.id={profile.id}")
-            conn = psycopg2.connect(os.environ["DATABASE_URL"])
-            match_user(conn, current_user.id)
-        except Exception as e:
-            print("Error running initial matching:", e)
 
         return redirect(url_for("onboarding.step4"))
 
