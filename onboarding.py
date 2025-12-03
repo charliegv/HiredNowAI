@@ -87,16 +87,21 @@ def step2():
         try:
             user_id = current_user.id  # capture before thread
 
-            def run_match():
-                conn = psycopg2.connect(os.environ["DATABASE_URL"])
-                match_user(conn, user_id)
-                conn.close()
+            # Insert user_id into match queue
+            from psycopg2.extras import RealDictCursor
 
-            run_async(run_match)
-            print(f"[MATCH] Async matching triggered for user {user_id}")
+            conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("INSERT INTO match_queue (user_id) VALUES (%s)", (user_id,))
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            print(f"[MATCH] Queued matching job for user {user_id}")
+
 
         except Exception as e:
-            print("Error triggering matching thread:", e)
+            print("Error Queuing matching thread:", e)
 
         # Redirect instantly, do not wait for matching
         return redirect(url_for("onboarding.step3"))

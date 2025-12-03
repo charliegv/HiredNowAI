@@ -84,3 +84,20 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+
+  # -----------------------------------------------------
+  # Matching Worker
+  # -----------------------------------------------------
+  - type: worker
+    name: hirednow-match-worker
+    env: python
+    branch: master
+    buildCommand: pip install -r requirements.txt
+    startCommand: python workers/match_worker.py
+    plan: starter
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
