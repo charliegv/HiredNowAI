@@ -2,6 +2,10 @@
 import os
 import sys
 
+print("[DEBUG] __file__:", __file__)
+print("[DEBUG] cwd:", os.getcwd())
+print("[DEBUG] initial sys.path:", sys.path)
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
