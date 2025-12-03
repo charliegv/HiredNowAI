@@ -5,6 +5,9 @@ import sys
 print("[DEBUG] __file__:", __file__)
 print("[DEBUG] cwd:", os.getcwd())
 print("[DEBUG] initial sys.path:", sys.path)
+PROJECT_ROOT = "/opt/render/project/src"
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
