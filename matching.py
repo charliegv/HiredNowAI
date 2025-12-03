@@ -1,4 +1,5 @@
 import os
+import ast
 from math import radians, sin, cos, sqrt, atan2
 from typing import Optional, List
 
@@ -7,57 +8,26 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from openai import OpenAI
 from dotenv import load_dotenv
-import heapq
 
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-# ---------------------------------------------
-# Normalize country
-# ---------------------------------------------
+# -----------------------------
+# Helpers
+# -----------------------------
 def normalize_country(raw: Optional[str]) -> str:
     if not raw:
         return ""
-
     c = raw.strip().lower()
-
-    us = {
-        "usa",
-        "us",
-        "u.s.",
-        "america",
-        "united states",
-        "united states of america",
-    }
-    gb = {
-        "uk",
-        "u.k.",
-        "gb",
-        "g.b.",
-        "united kingdom",
-        "great britain",
-        "england",
-        "scotland",
-        "wales",
-        "northern ireland",
-    }
-
-    if c in us:
-        return "us"
-    if c in gb:
-        return "gb"
-
-    if len(c) == 2:
-        return c
-
-    return c
+    us = {"usa","us","u.s.","america","united states","united states of america"}
+    gb = {"uk","u.k.","gb","g.b.","united kingdom","great britain","england","scotland","wales","northern ireland"}
+    if c in us: return "us"
+    if c in gb: return "gb"
+    return c if len(c) == 2 else c
 
 
-# ---------------------------------------------
-# Cosine similarity
-# ---------------------------------------------
 def cosine_similarity(a: List[float], b: List[float]) -> float:
     a_arr = np.array(a, dtype=np.float32)
     b_arr = np.array(b, dtype=np.float32)
@@ -65,128 +35,78 @@ def cosine_similarity(a: List[float], b: List[float]) -> float:
     return float(np.dot(a_arr, b_arr) / denom)
 
 
-# ---------------------------------------------
-# Distance and location scoring
-# ---------------------------------------------
-def haversine(lat1: Optional[float], lon1: Optional[float],
-              lat2: Optional[float], lon2: Optional[float]) -> Optional[float]:
-    if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
+def parse_emb(val):
+    """Parse embeddings safely regardless of type."""
+    if val is None:
         return None
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        try:
+            parsed = ast.literal_eval(val)
+            return parsed if isinstance(parsed, list) else None
+        except:
+            return None
+    return None
 
+
+def haversine(lat1, lon1, lat2, lon2):
+    if None in (lat1, lon1, lat2, lon2):
+        return None
     R = 6371.0
     dlat = radians(lat2 - lat1)
     dlon = radians(lon2 - lon1)
-
-    a = sin(dlat / 2.0) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2.0) ** 2
-    c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a))
-
-    return R * c
+    a = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
+    return 2 * atan2(sqrt(a), sqrt(1.0 - a)) * R
 
 
-def location_score(profile: dict, job: dict) -> float:
-    if job.get("is_remote"):
-        return 0.9
-
-    dist = haversine(
-        profile.get("latitude"),
-        profile.get("longitude"),
-        job.get("latitude"),
-        job.get("longitude"),
-    )
-
-    if dist is None:
-        return 0.3
-
-    if dist <= 15:
-        return 1.0
-    if dist <= 30:
-        return 0.85
-    if dist <= 60:
-        return 0.65
-    if dist <= 100:
-        return 0.45
-    if dist <= 200:
-        return 0.25
+def location_score(profile, job):
+    if job.get("is_remote"): return 0.9
+    dist = haversine(profile["latitude"], profile["longitude"],
+                     job["latitude"], job["longitude"])
+    if dist is None: return 0.3
+    if dist <= 15: return 1.0
+    if dist <= 30: return 0.85
+    if dist <= 60: return 0.65
+    if dist <= 100: return 0.45
+    if dist <= 200: return 0.25
     return 0.1
 
 
-# ---------------------------------------------
-# Salary scoring
-# ---------------------------------------------
-def salary_score(profile: dict, job: dict) -> float:
-    jmin = job.get("salary_min")
-    jmax = job.get("salary_max")
-
-    # Coerce to integers if possible
-    try:
-        jmin = int(jmin) if jmin is not None else None
-    except Exception:
-        jmin = None
-
-    try:
-        jmax = int(jmax) if jmax is not None else None
-    except Exception:
-        jmax = None
-
+def salary_score(profile, job):
+    try: jmin = int(job.get("salary_min")) if job.get("salary_min") is not None else None
+    except: jmin = None
+    try: jmax = int(job.get("salary_max")) if job.get("salary_max") is not None else None
+    except: jmax = None
     if jmin is None or jmax is None:
         return 0.3
-
-    tmin = profile.get("min_salary")
-    tmax = profile.get("max_salary")
-
-    try:
-        tmin = int(tmin) if tmin is not None else 0
-    except Exception:
-        tmin = 0
-
-    try:
-        tmax = int(tmax) if tmax is not None else 9_999_999
-    except Exception:
-        tmax = 9_999_999
-
+    try: tmin = int(profile.get("min_salary") or 0)
+    except: tmin = 0
+    try: tmax = int(profile.get("max_salary") or 9999999)
+    except: tmax = 9999999
     overlap = min(jmax, tmax) - max(jmin, tmin)
-
-    if overlap >= 0:
-        return 1.0
-
-    distance = abs(overlap)
-    return max(0.15, 1.0 - (distance / 20_000.0))
+    if overlap >= 0: return 1.0
+    return max(0.15, 1.0 - abs(overlap)/20000)
 
 
-# ---------------------------------------------
-# Embeddings
-# ---------------------------------------------
-def generate_embedding(text: str) -> List[float]:
+def generate_embedding(text: str):
     resp = client.embeddings.create(
         model="text-embedding-3-small",
-        input=text,
+        input=text
     )
     return resp.data[0].embedding
 
 
-# ---------------------------------------------
-# Main matching logic
-# ---------------------------------------------
-
-def match_user(conn, user_id: int, limit: int = 200):
+# ----------------------------------------------------------------
+# MAIN MATCHING (STREAMING + PARSED EMBEDDINGS + LOW MEMORY)
+# ----------------------------------------------------------------
+def match_user(conn, user_id: int, limit=200):
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        # Load profile once
         cur.execute("""
             SELECT
-                id AS profile_id,
-                user_id,
-                job_titles,
-                city,
-                state,
-                country,
-                latitude,
-                longitude,
-                remote_preference,
-                min_salary,
-                max_salary,
-                miles_distance,
-                preference_embedding,
-                application_mode
+                id AS profile_id, user_id, job_titles, city, state, country,
+                latitude, longitude, remote_preference, min_salary, max_salary,
+                miles_distance, preference_embedding, application_mode
             FROM profile
             WHERE user_id = %s
         """, (user_id,))
@@ -196,124 +116,106 @@ def match_user(conn, user_id: int, limit: int = 200):
             print(f"[MATCH] No profile for user {user_id}")
             return
 
-        # Normalize country etc...
-        profile["country"] = normalize_country(profile.get("country"))
+        profile["country"] = normalize_country(profile["country"])
 
-        # Generate embedding ONCE if needed
-        if profile.get("preference_embedding") is None:
-            emb = generate_embedding(profile.get("job_titles") or "")
-            cur.execute("""
-                UPDATE profile
-                SET preference_embedding = %s
-                WHERE id = %s
-            """, (emb, profile["profile_id"]))
+        # ensure embedding exists
+        if profile["preference_embedding"] is None:
+            emb = generate_embedding(profile["job_titles"] or "")
+            cur.execute(
+                "UPDATE profile SET preference_embedding=%s WHERE id=%s",
+                (emb, profile["profile_id"])
+            )
             conn.commit()
             profile["preference_embedding"] = emb
 
-        user_emb = np.array(profile["preference_embedding"], dtype=np.float32)
+        user_emb = profile["preference_embedding"]
 
-    # ------------------------
-    # STREAM JOBS IN BATCHES
-    # ------------------------
+    # --------------------------
+    # STREAM JOBS INSTEAD OF LOADING ALL
+    # --------------------------
+    scored = []
+    keywords = [
+        k.strip().lower()
+        for k in (profile["job_titles"] or "").split(",")
+        if k.strip()
+    ]
+
+    max_miles = profile.get("miles_distance")
+    max_km = max_miles * 1.60934 if max_miles and max_miles > 0 else None
+
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.itersize = 2000   # fetch 2000 rows per roundtrip
+        cur.itersize = 2000
         cur.execute("""
             SELECT
                 id, job_url, title, description, city, state, country,
                 latitude, longitude, is_remote, salary_min, salary_max,
                 title_embedding, desc_embedding, company, posted_at
             FROM jobs
-            WHERE (country = %s OR is_remote = true)
+            WHERE (country=%s OR is_remote=true)
               AND expires_at >= NOW()
         """, (profile["country"],))
 
-        top_n = []   # heap for best N matches
-
-        keywords = [
-            k.strip().lower()
-            for k in (profile.get("job_titles") or "").split(",")
-            if k.strip()
-        ]
-
-        max_miles = profile.get("miles_distance")
-        max_km = max_miles * 1.60934 if max_miles and max_miles > 0 else None
-
         for job in cur:
-            # Distance filtering
-            if max_km and not job.get("is_remote"):
+            # distance filter
+            if max_km and not job["is_remote"]:
                 dist = haversine(
-                    profile.get("latitude"),
-                    profile.get("longitude"),
-                    job.get("latitude"),
-                    job.get("longitude"),
+                    profile["latitude"], profile["longitude"],
+                    job["latitude"], job["longitude"]
                 )
                 if dist is None or dist > max_km:
                     continue
 
-            # Compute scores
-            sem_title = (
-                cosine_similarity(user_emb, job["title_embedding"])
-                if job.get("title_embedding")
-                else 0.0
-            )
-            sem_desc = (
-                cosine_similarity(user_emb, job["desc_embedding"])
-                if job.get("desc_embedding")
-                else 0.0
-            )
+            # parse embeddings
+            title_emb = parse_emb(job["title_embedding"])
+            desc_emb = parse_emb(job["desc_embedding"])
 
+            sem_title = cosine_similarity(user_emb, title_emb) if title_emb else 0.0
+            sem_desc  = cosine_similarity(user_emb, desc_emb)  if desc_emb else 0.0
+
+            # keywords
             kw_score = 0.0
-            title_lower = (job.get("title") or "").lower()
-            desc_lower = (job.get("description") or "").lower()
+            t = (job["title"] or "").lower()
+            d = (job["description"] or "").lower()
             for kw in keywords:
-                if kw in title_lower:
-                    kw_score += 0.7
-                elif kw in desc_lower:
-                    kw_score += 0.4
+                if kw in t: kw_score += 0.7
+                elif kw in d: kw_score += 0.4
 
             loc = location_score(profile, job)
             sal = salary_score(profile, job)
 
-            remote_penalty = (
-                0.4 if not profile.get("remote_preference") and job.get("is_remote") else 0.0
-            )
+            remote_penalty = 0.4 if not profile["remote_preference"] and job["is_remote"] else 0.0
 
             final_score = (
-                sem_title * 0.45
-                + sem_desc * 0.10
-                + kw_score * 0.25
-                + loc * 0.12
-                + sal * 0.08
-                - remote_penalty
+                sem_title*0.45 + sem_desc*0.10 + kw_score*0.25
+                + loc*0.12 + sal*0.08 - remote_penalty
             )
 
-            if final_score < 0.20:
-                continue
+            scored.append((final_score, job))
+            # keep memory bounded to N
+            if len(scored) > limit * 3:
+                scored.sort(key=lambda x: x[0], reverse=True)
+                scored = scored[:limit]
 
-            heapq.heappush(top_n, (final_score, job))
+    # final sorting
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top_matches = scored[:limit]
 
-            # Keep memory bounded at N
-            if len(top_n) > limit:
-                heapq.heappop(top_n)
-
-            # free memory for this job ASAP
-            del job
-
-    # Sort winners
-    top_n.sort(reverse=True)
-
-    # Store matches
+    # -----------------------------------
+    # Write matches
+    # -----------------------------------
     with conn.cursor() as cur:
-        for score, job in top_n:
+        for score, job in top_matches:
+            if score < 0.20:
+                continue
             cur.execute("""
                 INSERT INTO matches (user_id, job_url, job_id, score, is_remote)
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (user_id, job_url)
                 DO UPDATE SET
-                    score = EXCLUDED.score,
-                    job_id = EXCLUDED.job_id,
-                    is_remote = EXCLUDED.is_remote,
-                    matched_at = NOW()
+                    score=EXCLUDED.score,
+                    job_id=EXCLUDED.job_id,
+                    is_remote=EXCLUDED.is_remote,
+                    matched_at=NOW()
             """, (
                 profile["user_id"],
                 job["job_url"],
@@ -323,7 +225,5 @@ def match_user(conn, user_id: int, limit: int = 200):
             ))
 
     conn.commit()
-    print(f"[MATCH] Stored {len(top_n)} matches for user {user_id}")
-
-    return top_n
-
+    print(f"[MATCH] Stored {len(top_matches)} matches for user {user_id}")
+    return top_matches
