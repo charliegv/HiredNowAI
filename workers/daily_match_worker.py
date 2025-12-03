@@ -1,4 +1,14 @@
+import sys
 import os
+
+# Add Render project root so matching/, bots/, utils/ are importable
+PROJECT_ROOT = "/opt/render/project/src"
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+# Add parent of /workers (local dev use)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
