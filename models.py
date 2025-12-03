@@ -2,8 +2,31 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.exc import OperationalError
+import time
 
 db = SQLAlchemy()
+
+def safe_query(func):
+    try:
+        return func()
+    except OperationalError:
+        time.sleep(0.5)
+        return func()
+
+
+def safe_db_commit(db):
+    try:
+        db.session.commit()
+    except OperationalError as e:
+        # likely Neon cold start, retry after 0.5s
+        time.sleep(0.5)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)

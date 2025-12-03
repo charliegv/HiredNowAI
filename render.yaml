@@ -1,1 +1,86 @@
-playwright install chromium
+services:
+  # -----------------------------------------------------
+  # 1. Web App
+  # -----------------------------------------------------
+  - type: web
+    name: hirednow-web
+    env: python
+    branch: master
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+
+  # -----------------------------------------------------
+  # 2. Continuous Worker (uses Playwright)
+  # -----------------------------------------------------
+  - type: worker
+    name: hirednow-worker
+    env: python
+    branch: master
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: python workers/worker.py
+    plan: starter
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # -----------------------------------------------------
+  # 3. Cron Job 1 – Process XML Feed (NO Playwright)
+  # -----------------------------------------------------
+  - type: cron
+    name: cron-process-xml-feed
+    env: python
+    branch: master
+    schedule: "0 6 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/process_xml_feed.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # -----------------------------------------------------
+  # 4. Cron Job 2 – Daily Match Worker (NO Playwright)
+  # -----------------------------------------------------
+  - type: cron
+    name: cron-daily-match-worker
+    env: python
+    branch: master
+    schedule: "10 6 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python workers/daily_match_worker.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # -----------------------------------------------------
+  # 5. Cron Job 3 – Matches To Apply (USES Playwright)
+  # -----------------------------------------------------
+  - type: cron
+    name: cron-matches-to-apply
+    env: python
+    branch: master
+    schedule: "20 6 * * *"
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: python workers/matches_to_apply.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false

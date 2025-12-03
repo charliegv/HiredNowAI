@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, render_template
 from config import Config
 from models import db
 from auth import auth
@@ -32,6 +32,13 @@ def create_app():
     return app
 
 app = create_app()
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    app.logger.error(f"Unhandled error: {e}")
+    return render_template("error.html"), 500
+
 
 if __name__ == "__main__":
     app.run()
