@@ -91,64 +91,75 @@ def build_docx_from_json(cv_json):
 async def generate_custom_cv(base_cv_text, job_text, user):
 
     prompt = f"""
-	You are an expert CV writer who creates high-impact, ATS-optimised CVs.
-	
-	Rewrite the candidate's CV into a significantly improved version that is:
-	
-	- Highly professional
-	- ATS optimised with natural keyword embedding
-	- Clear, concise, accomplishment-oriented
-	- Focused on measurable impact (quantify where appropriate)
-	- Tailored to the job description
-	- Matched to modern recruiter expectations (2024 standards)
-	
-	Rules:
-	- Keep all factual details accurate
-	- Add polish, clarity, stronger action verbs and business impact
-	- Expand responsibilities only when implied but not stated
-	- Convert responsibilities → achievements wherever useful
-	- Summaries must be sharp and positioned as a strong value proposition
-	- Do NOT invent employment, education or tools the user didn’t have
-	- You MAY infer reasonable results or measurable outcomes based on context
-	
-	Output ONLY valid JSON. No markdown. No commentary.
-	
-	JSON structure:
-	{{
-	  "first_name": "",
-	  "last_name": "",
-	  "email": "",
-	  "phone": "",
-	  "address": "",
-	  "summary": "",
-	  "skills": [],
-	  "job_titles": [],
-	  "experience": [
-	    {{
-	      "title": "",
-	      "company": "",
-	      "location": "",
-	      "start_date": "",
-	      "end_date": "",
-	      "responsibilities": [],
-	      "achievements": []
-	    }}
-	  ],
-	  "education": [],
-	  "certifications": [],
-	  "languages": [],
-	  "additional_details": ""
-	}}
-	
-	Base CV:
-	{base_cv_text}
-	
-	Job Description:
-	{job_text}
-	
-	Candidate:
-	{user.get("first_name","")} {user.get("last_name","")}
-	"""
+    You are a world-class professional CV writer specialising in ATS optimisation, clarity, impact, and job alignment.
+    
+    Your task is to rewrite and restructure the candidate’s CV into a significantly improved version that:
+    
+    - Is noticeably stronger, clearer and more professional
+    - Is fully ATS optimised with natural keyword usage
+    - Corrects all grammar, style, clarity, and formatting issues
+    - Embeds AT LEAST THREE high-value skills directly extracted from the job description
+    - Highlights achievements over responsibilities
+    - Uses strong action verbs and measurable outcomes wherever logically inferable
+    - Modernises the structure to meet 2024–2025 hiring standards
+    - Does NOT fabricate employment, education, tools, or certifications
+    - May infer reasonable results ONLY when strongly implied by context
+    - Keeps all factual information correct and anchored in the original CV
+    
+    Rewrite guidelines:
+    - Transform weak responsibilities into strong bullet-point achievements
+    - Remove filler or non-impactful language (“responsible for”, “helped with”, etc.)
+    - Rewrite the summary into a sharp, value-driven pitch tailored to the job
+    - Ensure skills are grouped logically (technical, soft, tools) and align with the job description
+    - Maintain concise sentences; no long paragraphs
+    - Standardise formatting, dates, job titles and location style
+    
+    Special requirements:
+    - Ensure at least three job-description skills appear in the CV naturally
+    - Improve readability and flow
+    - Maintain JSON structure exactly with no deviation
+    
+    OUTPUT ONLY valid JSON.
+    NO markdown.
+    NO explanations.
+    No commentary.
+    
+    JSON structure:
+    {{
+      "first_name": "",
+      "last_name": "",
+      "email": "",
+      "phone": "",
+      "address": "",
+      "summary": "",
+      "skills": [],
+      "job_titles": [],
+      "experience": [
+        {{
+          "title": "",
+          "company": "",
+          "location": "",
+          "start_date": "",
+          "end_date": "",
+          "responsibilities": [],
+          "achievements": []
+        }}
+      ],
+      "education": [],
+      "certifications": [],
+      "languages": [],
+      "additional_details": ""
+    }}
+    
+    Base CV:
+    {base_cv_text}
+    
+    Job Description:
+    {job_text}
+    
+    Candidate Name:
+    {user.get("first_name","")} {user.get("last_name","")}
+    """
 
     response = await client.chat.completions.create(
         model="gpt-4.1",

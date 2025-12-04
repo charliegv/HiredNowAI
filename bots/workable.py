@@ -747,6 +747,9 @@ class WorkableBot(BaseATSBot):
         proxy_config = self.pick_proxy()
         user_agent = self.pick_user_agent()
 
+        if self.debug:
+            print(f"[Workable DEBUG] Proxy selected: {proxy_config}")
+
         try:
             async with async_playwright() as p:
                 launch_args = {"headless": not self.show_browser}

@@ -195,7 +195,7 @@ async def worker_loop():
 
             # 2 - Base CV load
             try:
-                base_cv_text = await load_cv_text(user["cv_location"])
+                base_cv_text = str(user["ai_cv_data"])
             except Exception as e:
                 await mark_manual_required(pool, app_id, "CV load failed — please apply manually", cv_url=None)
                 continue
