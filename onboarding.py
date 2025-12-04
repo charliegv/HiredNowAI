@@ -13,7 +13,7 @@ from utils.background import run_async
 
 onboarding = Blueprint("onboarding", __name__)
 
-UPLOAD_FOLDER = "uploads/cvs"
+UPLOAD_FOLDER = "tmp/cvs"
 
 
 # =========================================================
@@ -127,25 +127,28 @@ def step3():
 
         # Handle CV (optional)
         file = request.files.get("cv_file")
+        print(file)
         if file and file.filename:
             filename = secure_filename(file.filename)
 
-            user_folder = os.path.join(UPLOAD_FOLDER, str(current_user.id))
-            os.makedirs(user_folder, exist_ok=True)
-
-            cv_path = os.path.join(user_folder, filename)
+            # Always use true temp dir in Render
+            cv_path = os.path.join("/tmp", filename)
             file.save(cv_path)
 
-            # Upload to S3
-            s3_url = upload_to_s3(cv_path, folder=f"user-cvs/{current_user.id}")
-
-            # Save remote URL
-            profile.cv_location = s3_url
-
-            # Extract + AI parse
+            # Parse the CV locally BEFORE upload
             raw_text = extract_cv_text(cv_path)
             parsed = parse_cv_with_ai(raw_text)
             profile.ai_cv_data = parsed
+
+            # Upload to S3 after parsing
+            s3_url = upload_to_s3(cv_path, folder=f"user-cvs/{current_user.id}")
+            profile.cv_location = s3_url
+
+            # Optionally remove temp file
+            try:
+                os.remove(cv_path)
+            except:
+                pass
 
         # Mark onboarding complete
         profile.onboarding_complete = True

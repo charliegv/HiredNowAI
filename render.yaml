@@ -21,21 +21,42 @@ services:
       - key: AWS_S3_BUCKET
         sync: false
 
-  # -----------------------------------------------------
-  # 2. Continuous Worker (uses Playwright)
-  # -----------------------------------------------------
+  # -----------------------------
+  # PLAYWRIGHT WORKER SERVICE
+  # -----------------------------
   - type: worker
     name: hirednow-worker
-    env: python
-    branch: master
-    buildCommand: pip install -r requirements.txt && playwright install chromium
-    startCommand: python workers/worker.py
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
     plan: starter
     envVars:
       - key: DATABASE_URL
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+      # -----------------------
+      # YOUR CUSTOM ENV VARS
+      # -----------------------
+      - key: SHOW_BROWSER
+        value: "false"
+      - key: CV_GENERATION_TEST
+        value: "false"
+      - key: TEST_MODE
+        value: "false"
+      - key: DEBUG_MODE
+        value: "true"
+      - key: CAPSOLVER_API_KEY
+        sync: false   # secret API key stored safely in Render dashboard
 
   # -----------------------------------------------------
   # 3. Cron Job 1 – Process XML Feed (NO Playwright)
@@ -77,7 +98,7 @@ services:
     env: python
     branch: master
     schedule: "20 6 * * *"
-    buildCommand: pip install -r requirements.txt && playwright install chromium
+    buildCommand: pip install -r requirements.txt && playwright install --with-deps chromium
     startCommand: python workers/matches_to_apply.py
     envVars:
       - key: DATABASE_URL
