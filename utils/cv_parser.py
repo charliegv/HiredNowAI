@@ -39,11 +39,38 @@ def extract_text_from_pdf(path):
 
 def extract_text_from_docx(path):
     """Extract text from .docx using python-docx."""
+    import zipfile
+
+    # Check if it is a valid zip/docx
+    if zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path, "r") as z:
+            print("DOCX debug - zip entries:", z.namelist())
+
     try:
         d = docx.Document(path)
-        return "\n".join(p.text for p in d.paragraphs)
-    except Exception:
+
+        # Get paragraph text
+        para_texts = [p.text for p in d.paragraphs if p.text and p.text.strip()]
+
+        # Also extract text from tables as a fallback
+        table_texts = []
+        for table in d.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for p in cell.paragraphs:
+                        if p.text and p.text.strip():
+                            table_texts.append(p.text)
+
+        all_text = "\n".join(para_texts + table_texts)
+        return all_text
+
+    except Exception as e:
+        import traceback
+        print("DOCX PARSE ERROR:", repr(e))
+        traceback.print_exc()
         return ""
+
+
 
 
 def extract_text_from_doc(path):

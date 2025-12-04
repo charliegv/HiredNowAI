@@ -13,7 +13,7 @@ from utils.background import run_async
 
 onboarding = Blueprint("onboarding", __name__)
 
-UPLOAD_FOLDER = "tmp/cvs"
+UPLOAD_FOLDER = "tmp/"
 
 
 # =========================================================
@@ -133,6 +133,7 @@ def step3():
 
             # Always use true temp dir in Render
             cv_path = os.path.join("/tmp", filename)
+            file.stream.seek(0)
             file.save(cv_path)
 
             # Parse the CV locally BEFORE upload
