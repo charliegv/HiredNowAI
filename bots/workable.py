@@ -643,34 +643,35 @@ class WorkableBot(BaseATSBot):
                     fields.append({"name": name, "value": value})
 
             # ----- Safe numeric conversion for QA fields only -----
+            # ----- Safe numeric conversion for QA fields only -----
             for field in fields:
                 name = field["name"]
                 value = field["value"]
 
-                # Convert only QA_xxxxx fields that are not arrays and not booleans
-                if not name.startswith("QA_"):
+                # Only numeric conversion for QA_* fields, and only if the value is a string
+                if not name.startswith(("QA_", "CA_")):
                     continue
                 if not isinstance(value, str):
                     continue
 
-                v = value.replace(",", "").strip()
+                raw = value.strip()
 
-                # Skip values that are obviously phone-like or date-like
-                if len(v) > 8 and v.isdigit():
-                    # Prevent converting long numbers like phone numbers
+                # Detect Workable salary range encoding: "100,000,200,000"
+                parts = raw.split(",")
+                if len(parts) == 4:
+                    # Example: ["100", "000", "200", "000"]
+                    try:
+                        low = int(parts[0] + parts[1])  # "100" + "000" = 100000
+                        field["value"] = low
+                    except:
+                        pass
                     continue
 
-                # Now check if this QA answer is numeric
-                if v.isdigit():
-                    field["value"] = int(v)
-                else:
-                    # Try float if allowed
+                # Otherwise normal handling
+                raw = raw.replace(",", "")
+                if raw.isdigit():
                     try:
-                        f = float(v)
-                        if f.is_integer():
-                            field["value"] = int(f)
-                        else:
-                            field["value"] = f
+                        field["value"] = int(raw)
                     except:
                         pass
 
