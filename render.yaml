@@ -98,7 +98,7 @@ services:
     env: python
     branch: master
     schedule: "20 6 * * *"
-    buildCommand: pip install -r requirements.txt && playwright install --with-deps chromium
+    buildCommand: pip install -r requirements.txt
     startCommand: python workers/matches_to_apply.py
     envVars:
       - key: DATABASE_URL
