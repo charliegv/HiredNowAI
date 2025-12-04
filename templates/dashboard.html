@@ -48,13 +48,6 @@
       Preferences
     </a>
 
-    <!-- Only show if approval mode is active -->
-    {% if profile.application_mode == "approval" %}
-    <a href="{{ url_for('dashboard.pending_approvals') }}"
-       class="px-5 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 transition text-sm font-medium">
-      Pending Approvals ({{ stats.pending_approvals or 0 }})
-    </a>
-    {% endif %}
 
   </div>
 

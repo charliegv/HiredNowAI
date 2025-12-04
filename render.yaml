@@ -8,7 +8,7 @@ services:
     branch: master
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
-    plan: free
+    plan: starter
     envVars:
       - key: DATABASE_URL
         sync: false
