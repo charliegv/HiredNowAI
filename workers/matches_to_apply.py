@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MAX_APPLICATIONS_PER_DAY = 10
+MAX_APPLICATIONS_PER_DAY = 30
 
 
 async def process_auto_applications():
@@ -69,6 +69,12 @@ async def process_auto_applications():
               AND p.is_active = TRUE
               AND p.application_mode = 'auto'
               AND p.onboarding_complete = TRUE
+                              AND j.company NOT IN (
+			        SELECT j2.company
+			        FROM applications a2
+			        JOIN jobs j2 ON j2.id = a2.job_id
+			        WHERE a2.user_id = $1
+			  )
             ORDER BY m.score DESC NULLS LAST
             LIMIT $2
         """, user_id, remaining_quota)
