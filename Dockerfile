@@ -5,8 +5,8 @@ FROM mcr.microsoft.com/playwright/python:v1.48.0-jammy
 WORKDIR /app
 
 # Copy and install Python dependencies first (cache layer)
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-worker.txt .
+RUN pip install --no-cache-dir -r requirements-worker.txt
 
 # Copy the rest of your worker code
 COPY . .
