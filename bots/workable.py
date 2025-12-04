@@ -654,6 +654,11 @@ class WorkableBot(BaseATSBot):
                 if not isinstance(value, str):
                     continue
 
+                hidden_input = page.locator(
+                    f"input[name='{name}'][type='hidden'], input[name='{name}']:not([type])")
+                if await hidden_input.count() > 0:
+                    continue
+
                 raw = value.strip()
 
                 # Detect Workable salary range encoding: "100,000,200,000"
