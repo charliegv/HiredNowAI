@@ -7,5 +7,7 @@ RUN pip install --no-cache-dir -r requirements-worker.txt
 
 COPY . .
 
+COPY Webshare_1000_proxies.txt /app/Webshare_1000_proxies.txt
+
 # DO NOT run "playwright install" — browsers already included.
 CMD ["python", "workers/worker.py"]

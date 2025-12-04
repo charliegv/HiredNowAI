@@ -59,41 +59,6 @@
   </div>
 
 
-  <!-- Approval Mode Preview -->
-  {% if profile.application_mode == "approval" %}
-  <div class="bg-white p-6 rounded-xl shadow-sm border border-yellow-200 mb-10">
-    <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-      Preview of approval requests
-      <span class="text-xs text-yellow-600">(visible because approval mode is active)</span>
-    </h3>
-
-    <div class="p-4 border rounded-lg bg-gray-50 flex items-center justify-between">
-
-      <div>
-        <p class="font-medium text-gray-900">Example Job Title</p>
-        <p class="text-gray-600 text-sm">Example Company • Example Location</p>
-        <p class="text-gray-500 text-xs mt-1">
-          Approve to send a tailored CV and application message.
-        </p>
-      </div>
-
-      <div class="flex gap-2">
-        <button class="px-3 py-2 bg-green-600 text-white text-sm rounded-lg shadow hover:bg-green-700 transition">
-          Approve
-        </button>
-        <button class="px-3 py-2 bg-red-600 text-white text-sm rounded-lg shadow hover:bg-red-700 transition">
-          Reject
-        </button>
-      </div>
-
-    </div>
-
-    <p class="text-xs text-gray-500 mt-3">
-      When AI finds roles that match your preferences, they’ll appear here for approval.
-    </p>
-  </div>
-  {% endif %}
-
 
   <!-- Stats Grid -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
