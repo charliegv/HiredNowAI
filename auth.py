@@ -12,6 +12,11 @@ def signup():
         email = request.form["email"]
         password = request.form["password"]
 
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            flash("An account with this email already exists. Please log in.", "error")
+            return redirect(url_for("auth.login"))
+
         hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
         user = User(email=email, password_hash=hashed_pw)
 
