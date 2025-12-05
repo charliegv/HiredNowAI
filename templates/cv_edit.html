@@ -37,6 +37,8 @@
       <span class="text-gray-700">Phone</span>
       <input type="text" name="phone"
              value="{{ cv.phone or '' }}"
+             pattern="^\+\d{6,15}$"
+             title="Phone number must start with + and include your country code, for example +447912345678"
              class="mt-1 w-full border rounded-lg p-3" required />
     </label>
 
