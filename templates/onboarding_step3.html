@@ -56,26 +56,36 @@
 </div>
 
 
-    <!-- CV Upload -->
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">
-        Upload your CV
-      </label>
+<!-- CV Upload -->
+<div>
+  <label class="block text-gray-700 font-medium mb-2">
+    Upload your CV
+  </label>
 
-      <input
-        type="file"
-        name="cv_file"
-        accept=".pdf,.docx,.txt"
-        class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-white text-gray-700"
-        required
-      />
+  <!-- Strong file format warning -->
+  <p class="text-red-600 text-sm font-semibold mb-2">
+    Only .docx, .pdf, or .txt files are accepted.
+  </p>
 
-      {% if profile and profile.cv_location %}
-        <p class="text-xs text-gray-500 mt-1">
-          Current CV: {{ profile.cv_location }}
-        </p>
-      {% endif %}
-    </div>
+  <input
+    type="file"
+    name="cv_file"
+    accept=".pdf,.docx,.txt"
+    class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-white text-gray-700"
+    required
+  />
+
+  <p class="text-xs text-gray-500 mt-1">
+    Accepted formats: Microsoft Word (.docx), PDF, or plain text (.txt)
+  </p>
+
+  {% if profile and profile.cv_location %}
+    <p class="text-xs text-gray-500 mt-1">
+      Current CV: {{ profile.cv_location }}
+    </p>
+  {% endif %}
+</div>
+
 
     <button
       class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition">

@@ -1,3 +1,4 @@
+import logging
 import os
 import json
 import random
@@ -380,6 +381,29 @@ class WorkableBot(BaseATSBot):
         # Fallback: treat as long
         return False
 
+    async def solve_turnstile_with_retries(self, site_key, page_url, max_retries=3, delay=4):
+        solver = CapSolverClient()
+
+        for attempt in range(1, max_retries + 1):
+            print(f"[Captcha] Attempt {attempt} of {max_retries}")
+
+            token = solver.solve_turnstile(
+                website_key=site_key,
+                website_url=page_url
+            )
+
+            # Success
+            if token:
+                print(f"[Captcha] Success on attempt {attempt}")
+                return token
+
+            # Failure - wait then retry
+            print(f"[Captcha] Failed on attempt {attempt}, waiting {delay}s before retry")
+            await asyncio.sleep(delay)
+
+        print("[Captcha] All attempts failed")
+        return None
+
 
 
     # =============================================================
@@ -682,6 +706,7 @@ class WorkableBot(BaseATSBot):
 
             return fields
 
+
         async def extract_resume(page):
             """
             Extract resume metadata (signed S3 URL + file name)
@@ -876,12 +901,20 @@ class WorkableBot(BaseATSBot):
 
                         print(f"Turnstile site key: {site_key}")
 
-                        solver = CapSolverClient()
-                        token = solver.solve_turnstile(website_key=site_key, website_url=page.url)
+                        # Try solving captcha up to 3 times with delay
+                        token = await self.solve_turnstile_with_retries(
+                            site_key,
+                            page.url,
+                            max_retries=3,
+                            delay=5  # wait 5 seconds between tries
+                        )
 
                         if not token:
-                            print("Captcha solve failed")
-                            return ApplyResult(status="manual_required", message="Captcha solve failed")
+                            logging.info("[Captcha] Could not solve after 3 attempts")
+                            return ApplyResult(
+                                status="retry",
+                                message="Captcha unsolved after retries"
+                            )
 
                         print(f"Got token ({len(token)} chars)")
 
@@ -1536,37 +1569,6 @@ class WorkableBot(BaseATSBot):
                         print("[Workable DEBUG] GDPR checkbox handler error:", e)
                 continue
 
-            # --- NEW: force-detect Workable special dropdowns before standard inputs ---
-            combo_input = block.locator("input[role='combobox']")
-            if await combo_input.count() > 0:
-                # Extract profile or AI answer
-                direct = self._high_conf_profile_answer(
-                    label_norm,
-                    profile_answers,
-                    ai_data,
-                    user,
-                    current_employer,
-                    short_mode=is_short,
-                )
-
-                if direct is None:
-                    desired = await self._generate_ai_answer(
-                        label_norm,
-                        ai_data,
-                        profile_answers,
-                        job_title,
-                        company_name,
-                        job_description,
-                        short_mode=is_short,
-                    )
-                else:
-                    desired = direct
-
-                if self.debug:
-                    print(f"[Workable DEBUG] Combo detected: '{label_text}' => '{desired}'")
-
-                await self.handle_workable_combobox(block, page, desired)
-                continue
 
             # --------------------------------------------------------------------
             # 2. Standard inputs (textarea, select, input)

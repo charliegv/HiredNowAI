@@ -68,6 +68,7 @@ async def process_auto_applications():
               AND a.id IS NULL
               AND p.is_active = TRUE
               AND p.application_mode = 'auto'
+              and j.expires_at >= now()
               AND p.onboarding_complete = TRUE
                               AND j.company NOT IN (
 			        SELECT j2.company

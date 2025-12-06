@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from models import db, Profile
 from werkzeug.utils import secure_filename
@@ -127,6 +127,9 @@ def step3():
 
         # Handle CV (optional)
         file = request.files.get("cv_file")
+        if not file or file.filename.strip() == "":
+            flash("Please upload a valid CV file (.pdf, .docx, .txt)", "error")
+            return redirect(request.url)
         print(file)
         if file and file.filename:
             filename = secure_filename(file.filename)
