@@ -40,6 +40,8 @@ class GreenhouseBot(BaseATSBot):
         if self.debug:
             print(f"[Greenhouse DEBUG] {message}")
 
+
+
     def g(self, obj, field: str, default=None):
         """
         Safe accessor for:
@@ -73,6 +75,29 @@ class GreenhouseBot(BaseATSBot):
             return obj[field]
         except Exception:
             return default
+
+    async def is_required_field(self, element, label_text):
+        try:
+            # aria-required
+            aria = await element.get_attribute("aria-required")
+            if aria and aria.lower() == "true":
+                return True
+        except:
+            pass
+
+        try:
+            # HTML required attribute
+            req = await element.get_attribute("required")
+            if req is not None:
+                return True
+        except:
+            pass
+
+        # Label contains *
+        if "*" in (label_text or ""):
+            return True
+
+        return False
 
     async def ai_pick_from_options(self, question: str, options: list[str], profile_answers: dict, ai_data) -> str:
         """
@@ -434,37 +459,61 @@ class GreenhouseBot(BaseATSBot):
     async def wait_for_greenhouse_form(self, page):
         """
         Detects hosted, embedded, or self-hosted Greenhouse forms.
-        Returns the <form> element containing Greenhouse question inputs.
+        Much more robust than previous version.
         """
+
+        selectors = [
+            "form#application-form",
+            "form.application--form",
+            "form[action*='apply']",
+            "form[action*='/applications']",
+            "form[action*='job']"
+        ]
 
         for attempt in range(20):
             self.log(f"[Form Detection] Attempt {attempt + 1}")
 
-            # 1. Check all forms on page
+            # 1. direct form selectors
+            for sel in selectors:
+                form = page.locator(sel)
+                if await form.count() > 0:
+                    self.log(f"[Form Detection] Found form via selector {sel}")
+                    return form.first
+
+            # 2. any form with typical GH fields
             forms = page.locator("form")
             count = await forms.count()
 
             for i in range(count):
                 f = forms.nth(i)
-                # Detect Greenhouse question fields inside
-                has_q = await f.locator("[name^='question_']").count()
 
-                if has_q > 0:
-                    self.log(f"[Form Detection] Greenhouse form detected (form #{i})")
+                # Greenhouse identity fields
+                if await f.locator("input[name='first_name'], input#first_name").count() > 0:
                     return f
 
-            # 2. Look for iframes containing GH
+                if await f.locator("input[name='last_name'], input#last_name").count() > 0:
+                    return f
+
+                if await f.locator("input[name='email'], input#email").count() > 0:
+                    return f
+
+                # custom question fields
+                if await f.locator("input, textarea, select").count() > 10:
+                    self.log("[Form Detection] Large form detected → likely GH")
+                    return f
+
+            # 3. iframe scan
             for frame in page.frames:
                 try:
                     if "greenhouse" in (frame.url or "").lower():
-                        form = frame.locator("form")
-                        if await form.locator("[name^='question_']").count() > 0:
-                            self.log("[Form Detection] Greenhouse form detected in iframe")
-                            return form
+                        f = frame.locator("form")
+                        if await f.locator("input, textarea, select").count() > 5:
+                            self.log("[Form Detection] Found form in iframe")
+                            return f.first
                 except:
                     continue
 
-            await page.wait_for_timeout(1000)
+            await page.wait_for_timeout(500)
 
         raise Exception("No Greenhouse-style form detected after retries.")
 
@@ -1146,9 +1195,17 @@ class GreenhouseBot(BaseATSBot):
                 maxlength,
             )
 
-            if not answer or not str(answer).strip():
-                self.log("Answer empty or whitespace, skipping field")
-                continue
+            # Detect required field
+            is_required = await self.is_required_field(element, label)
+
+            if (not answer or not str(answer).strip()):
+                if is_required:
+                    self.log(
+                        f"[REQUIRED] No answer generated for required field '{label}'. Forcing default safe answer.")
+                    answer = "N/A" if (await element.get_attribute("type")) == "text" else "Yes"
+                else:
+                    self.log("Answer empty or whitespace, skipping optional field")
+                    continue
 
             self.log(f"Generated answer: {answer}")
 
