@@ -153,7 +153,7 @@ def match_user(conn, user_id: int, limit=200):
             FROM jobs
             WHERE (country=%s OR is_remote=true)
               AND expires_at >= NOW()
-              and source_ats = 'workable'
+              and (source_ats = 'workable' or (source_ats = 'greenhouse' and job_url like '%job-boards.greenhouse%'))
         """, (profile["country"],))
 
         for job in cur:

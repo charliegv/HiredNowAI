@@ -20,8 +20,8 @@ import asyncio
 import asyncpg
 
 
-# from bots.greenhouse import GreenhouseBot
-from bots.lever import LeverBot
+from bots.greenhouse import GreenhouseBot
+# from bots.lever import LeverBot
 # from bots.smartrec import SmartRecruitersBot
 from bots.workable import WorkableBot
 
@@ -47,7 +47,7 @@ WITH next_task AS (
     SELECT id
     FROM applications
     WHERE status = 'pending'
-    ORDER BY created_at
+    ORDER BY RANDOM()
     LIMIT 1
     FOR UPDATE SKIP LOCKED
 )
@@ -68,7 +68,7 @@ async def load_user_profile(pool, user_id):
 
 def get_bot(ats_type):
     bots = {
-        # "greenhouse": GreenhouseBot(),
+         "greenhouse": GreenhouseBot(),
         # "lever": LeverBot(),
         # "smartrecruiters": SmartRecruitersBot(),
         "workable": WorkableBot(),

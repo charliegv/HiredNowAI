@@ -2,15 +2,18 @@ import os
 import json
 import random
 import asyncio
+import mimetypes
+from typing import List, Dict, Any, Optional
 
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 from openai import AsyncOpenAI
 
+from bs4 import BeautifulSoup
+
 from bots.base import BaseATSBot, ApplyResult
 from utils.s3_uploader import upload_to_s3
 
-import mimetypes
 import requests
 
 load_dotenv()
@@ -19,7 +22,6 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 class LeverBot(BaseATSBot):
-
     def __init__(self):
         proxy_file = os.getenv("PROXY_FILE", "/mnt/data/Webshare_1000_proxies.txt")
 
@@ -32,60 +34,48 @@ class LeverBot(BaseATSBot):
         self.test_mode = os.getenv("TEST_MODE", "false").lower() == "true"
         self.show_browser = os.getenv("SHOW_BROWSER", "false").lower() == "true"
 
-        # A small pool of realistic desktop user agents
+        # Realistic desktop user agents
         self.user_agents = [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
         ]
 
-    # ----------------------------------------------------------------------
-    # Small helpers for human like behaviour
-    # ----------------------------------------------------------------------
+    # ============================================================
+    # Human style helpers
+    # ============================================================
     async def human_sleep(self, min_s=0.4, max_s=1.2):
         await asyncio.sleep(random.uniform(min_s, max_s))
 
     async def human_mouse_move(self, page, target_x, target_y, steps=20):
-        """
-        Human-like mouse movement without relying on mouse.position (not available in async playwright)
-        Uses a bezier-like curve between random start offset and target.
-        """
-
-        # Pick a random starting point near the top-left of the viewport
-        # since we do not know the real current mouse position
+        # Start from some random point in the viewport
         start_x = random.uniform(50, 200)
         start_y = random.uniform(80, 180)
 
-        # Move mouse instantly to starting point (off element)
         await page.mouse.move(start_x, start_y, steps=3)
 
-        # Now simulate curved human movement to target
         for i in range(steps):
             t = i / float(steps)
-            # Bezier-like easing
             xt = start_x + (target_x - start_x) * (t * t)
             yt = start_y + (target_y - start_y) * (t * t)
             await page.mouse.move(xt, yt, steps=1)
             await asyncio.sleep(random.uniform(0.01, 0.04))
 
     async def human_type(self, locator, text: str):
-        """Type text character by character with random delays."""
-        # Clear field first in a realistic way
         try:
             await locator.click()
         except Exception:
             pass
+
         try:
             await locator.fill("")
         except Exception:
-            # If fill fails, continue and type anyway
             pass
 
         for ch in text:
             await locator.type(ch, delay=random.randint(40, 120))
 
     async def move_mouse_to_locator(self, page, locator):
-        """Move mouse smoothly to center of an element."""
         try:
             box = await locator.bounding_box()
             if not box:
@@ -95,11 +85,9 @@ class LeverBot(BaseATSBot):
             steps = random.randint(15, 35)
             await page.mouse.move(target_x, target_y, steps=steps)
         except Exception:
-            # If we cannot get box, ignore and let normal click handle it
             pass
 
     async def random_scroll(self, page):
-        """Small random scroll to look more like a user browsing."""
         try:
             delta = random.randint(200, 700)
             await page.mouse.wheel(0, delta)
@@ -107,65 +95,258 @@ class LeverBot(BaseATSBot):
         except Exception:
             pass
 
-    # ----------------------------------------------------------------------
-    # SMART QUESTION ANSWERING LAYER
-    # ----------------------------------------------------------------------
-    def answer_question(self, question, ai_data, profile_answers):
-        """
-        Smart fallback answer system:
-        1. Use profile.application_data
-        2. Use resume JSON
-        3. Positive fallback
-        """
-
+    # ============================================================
+    # Smart answering logic
+    # ============================================================
+    def answer_question(self, question: str, ai_data: dict, profile_answers: dict) -> str:
         if not isinstance(profile_answers, dict):
             profile_answers = {}
 
-        q = (question or "").lower()
+        q = (question or "").strip().lower()
 
-        # 1. Check stored profile answers
+        # Profile stored answers
         if profile_answers:
             for key, val in profile_answers.items():
-                if key.lower() in q or q in key.lower():
-                    return val
+                key_l = str(key).lower()
+                if q in key_l or key_l in q:
+                    return str(val)
 
-        # 2. Resume based answers
-        if "name" in q:
-            return f"{ai_data.get('first_name', '')} {ai_data.get('last_name', '')}".strip()
+        # Simple resume based answers
+        if "name" in q and "full" in q:
+            first = ai_data.get("first_name", "")
+            last = ai_data.get("last_name", "")
+            full = f"{first} {last}".strip()
+            if full:
+                return full
+
+        if "first name" in q:
+            return ai_data.get("first_name", "") or ai_data.get("given_name", "")
+
+        if "last name" in q or "surname" in q or "family name" in q:
+            return ai_data.get("last_name", "") or ai_data.get("family_name", "")
+
         if "email" in q:
             return ai_data.get("email", "")
-        if "phone" in q:
-            return ai_data.get("phone", "")
-        if "skills" in q:
-            return ", ".join(ai_data.get("skills", []))
-        if "experience" in q:
-            return ai_data.get("summary", "I have strong relevant experience.")
 
-        # 3. Smart acceptance focused fallbacks
+        if "phone" in q or "mobile" in q or "telephone" in q:
+            return ai_data.get("phone", "")
+
+        if "skills" in q:
+            skills = ai_data.get("skills", [])
+            if isinstance(skills, list):
+                return ", ".join(skills[:8])
+            return str(skills)
+
+        if "experience" in q:
+            return ai_data.get("summary", "I have strong relevant experience for this role.")
+
+        # Eligibility and logistics
         if "authorized" in q or "authorised" in q:
+            return "Yes"
+        if "work permit" in q or "work authorization" in q or "work authorisation" in q:
             return "Yes"
         if "sponsor" in q or "visa" in q:
             return "No"
-        if "relocate" in q:
+        if "relocate" in q or "relocation" in q:
             return "Yes"
-        if "start" in q or "availability" in q:
+        if "start" in q or "availability" in q or "available to begin" in q:
             return "Immediately"
-        if "salary" in q or "compensation" in q:
-            return "Open to market rate"
+        if "salary" in q or "compensation" in q or "pay expectation" in q:
+            return "Open to a fair market rate"
 
+        # Common yes or no style
+        if "criminal" in q or "offence" in q or "offense" in q:
+            return "No"
+        if "disability" in q and "accommodation" in q:
+            return "No accommodation is required."
+
+        # Default positive answer
         return "Yes"
 
-    # ----------------------------------------------------------------------
-    # DIRECT RESUME UPLOAD TO LEVER API (UNCHANGED LOGIC)
-    # ----------------------------------------------------------------------
-    async def upload_resume_to_lever(self, cv_path: str, account_id: str):
+    # ============================================================
+    # Deterministic Lever parsing
+    # ============================================================
+    def extract_lever_questions(self, html: str) -> List[Dict[str, Any]]:
         """
-        Upload resume directly to Lever /parseResume endpoint.
-        Returns parsed profile JSON including resumeStorageId.
+        Parse Lever application form questions using the consistent .application-question pattern.
+        Returns list of:
+        {
+          "question": "...",
+          "selector": "css selector",
+          "type": "input" | "textarea" | "select" | "file",
+          "options": [ { "value": "...", "label": "..." }, ... ]  # only for select
+        }
         """
-        import mimetypes
-        import requests
+        soup = BeautifulSoup(html, "html.parser")
+        results: List[Dict[str, Any]] = []
 
+        blocks = soup.select(".application-question")
+
+        for block in blocks:
+            # Some questions use <div class="application-label">,
+            # some use <label> with nested div.
+            label_el = None
+
+            if block.find("label"):
+                label_el = block.find("label")
+            elif block.find(class_="application-label"):
+                label_el = block.find(class_="application-label")
+
+            if not label_el:
+                continue
+
+            q_text = label_el.get_text(" ", strip=True)
+            if not q_text:
+                continue
+
+            q_lower = q_text.lower()
+
+            # Resume upload: special case
+            resume_input = block.find("input", attrs={"type": "file"})
+            if resume_input and resume_input.get("name"):
+                selector = f"input[name='{resume_input.get('name')}']"
+                results.append(
+                    {
+                        "question": q_text,
+                        "selector": selector,
+                        "type": "file",
+                        "options": [],
+                    }
+                )
+                continue
+
+            # Other fields inside this question block
+            input_el = None
+            textarea_el = None
+            select_el = None
+
+            # Avoid hidden inputs where possible
+            for el in block.find_all("input"):
+                if el.get("type") in ("hidden", "submit", "button", "file"):
+                    continue
+                input_el = el
+                break
+
+            textarea_el = block.find("textarea")
+            select_el = block.find("select")
+
+            # Choose the main field for this question
+            field_selector = None
+            ftype = None
+            options: List[Dict[str, str]] = []
+
+            if input_el and input_el.get("name"):
+                field_selector = f"input[name='{input_el.get('name')}']"
+                ftype = "input"
+            elif textarea_el and textarea_el.get("name"):
+                field_selector = f"textarea[name='{textarea_el.get('name')}']"
+                ftype = "textarea"
+            elif select_el and select_el.get("name"):
+                field_selector = f"select[name='{select_el.get('name')}']"
+                ftype = "select"
+                for opt in select_el.find_all("option"):
+                    val = opt.get("value") or ""
+                    label = opt.get_text(" ", strip=True)
+                    options.append({"value": val, "label": label})
+
+            if not field_selector or not ftype:
+                continue
+
+            results.append(
+                {
+                    "question": q_text,
+                    "selector": field_selector,
+                    "type": ftype,
+                    "options": options,
+                }
+            )
+
+        return results
+
+    def choose_select_value(
+        self,
+        question: str,
+        options: List[Dict[str, str]],
+        ai_data: dict,
+        profile_answers: dict,
+    ) -> Optional[str]:
+        if not options:
+            return None
+
+        # Remove empty or placeholder options
+        filtered = []
+        for opt in options:
+            label = (opt.get("label") or "").strip()
+            value = (opt.get("value") or "").strip()
+            if not label and not value:
+                continue
+            low = label.lower()
+            if "select" in low and "please" in low:
+                continue
+            if "choose" in low:
+                continue
+            filtered.append(opt)
+
+        if not filtered:
+            filtered = options
+
+        # Simple heuristic: just choose first valid option
+        chosen = filtered[0]
+        return chosen.get("value") or chosen.get("label") or None
+
+    def build_deterministic_actions(
+        self,
+        html: str,
+        ai_data: dict,
+        profile_answers: dict,
+    ) -> List[Dict[str, Any]]:
+        """
+        Build auto actions from parsed Lever questions and smart answer logic.
+        Used on every cycle before GPT actions.
+        """
+        actions: List[Dict[str, Any]] = []
+        questions = self.extract_lever_questions(html)
+
+        for q in questions:
+            q_text = q["question"]
+            selector = q["selector"]
+            q_type = q["type"]
+
+            if q_type == "file":
+                # Let dedicated upload logic handle resume, skip here
+                continue
+
+            if q_type in ("input", "textarea"):
+                answer = self.answer_question(q_text, ai_data, profile_answers)
+                actions.append(
+                    {
+                        "action": "auto_answer",
+                        "selector": selector,
+                        "question": q_text,
+                        "value": answer,
+                    }
+                )
+
+            elif q_type == "select":
+                value = self.choose_select_value(
+                    q_text, q.get("options") or [], ai_data, profile_answers
+                )
+                if value:
+                    actions.append(
+                        {
+                            "action": "select",
+                            "selector": selector,
+                            "value": value,
+                            "question": q_text,
+                        }
+                    )
+
+        return actions
+
+    # ============================================================
+    # Direct resume upload to Lever API
+    # ============================================================
+    async def upload_resume_to_lever(self, cv_path: str, account_id: str):
         url = "https://jobs.lever.co/parseResume"
 
         mime_type, _ = mimetypes.guess_type(cv_path)
@@ -173,17 +354,16 @@ class LeverBot(BaseATSBot):
             mime_type = "application/octet-stream"
 
         with open(cv_path, "rb") as f:
-            files = {
-                "resume": (os.path.basename(cv_path), f, mime_type),
-            }
+            files = {"resume": (os.path.basename(cv_path), f, mime_type)}
             data = {"accountId": account_id}
-
             response = requests.post(url, files=files, data=data, timeout=30)
 
         response.raise_for_status()
         return response.json()
 
-    # ----------------------------------------------------------------------
+    # ============================================================
+    # Proxy and user agent
+    # ============================================================
     def pick_proxy(self):
         if not self.proxies:
             return None
@@ -208,83 +388,63 @@ class LeverBot(BaseATSBot):
     def pick_user_agent(self):
         return random.choice(self.user_agents)
 
-    # ----------------------------------------------------------------------
-    # MAIN AI AGENT CALL (SMART ANSWERS + TIMEOUT)
-    # ----------------------------------------------------------------------
-    async def call_agent(self, html, current_url, ai_data, profile_answers, cover_letter):
-
-        truncated_html = html[:350000]
+    # ============================================================
+    # GPT agent for navigation and submit
+    # ============================================================
+    async def call_agent(
+        self,
+        html: str,
+        current_url: str,
+        ai_data: dict,
+        profile_answers: dict,
+        cover_letter: str,
+        state: dict,
+    ) -> List[Dict[str, Any]]:
+        truncated_html = html[:200000]
 
         prompt = f"""
 You are an expert browser automation planner for Lever job applications.
 You output ONLY a JSON array of actions.
 
-You receive:
+Most text fields are already covered by a deterministic system that fills them from user data.
+You should focus on:
 
-USER RESUME DATA:
+- clicking navigation and apply buttons
+- handling multi step forms
+- clicking submit buttons
+- waiting for new elements when needed
+
+User resume data:
 {json.dumps(ai_data, indent=2)}
 
-USER STORED APPLICATION ANSWERS:
+User stored answers:
 {json.dumps(profile_answers, indent=2)}
 
-Use ALL available user data to fill fields correctly.
+Cover letter (use only for fields that clearly request a full cover letter, otherwise keep answers short):
+{cover_letter}
 
-RULES FOR ANSWERING QUESTIONS:
-- If profile answers match the question, use them.
-- If the user's resume data (name, email, phone, skills, summary) can answer the question, use that.
-- If the question is unknown, answer in a way that maximises acceptance:
-    * Work eligibility -> "Yes"
-    * Sponsorship -> "No"
-    * Relocation -> "Yes"
-    * Start date -> "Immediately"
-    * Salary -> "Open to market rate"
-    * Anything else -> brief positive "Yes"
+Current page url:
+{current_url}
 
-- NEVER leave required fields empty.
-- NEVER write long paragraphs in answer fields.
-- Cover letter goes into any textarea asking for one.
+Recent state:
+{json.dumps(state, indent=2)}
 
-IMPORTANT: Lever custom questions follow a consistent pattern.
+Lever specific guidance:
 
-To answer questions, follow this detection logic:
+- Application form is inside <form id="application-form">.
+- Question blocks use .application-question but text inputs are already handled for you.
+- You MAY still use auto_answer for questions that look clearly missed or for new ones that appear after choices.
+- Valid submit buttons include:
+  * button[type='submit']
+  * button.postings-btn
+  * button.template-btn-submit
+  * button:has-text("Apply")
+  * button:has-text("Submit")
 
-Look for question text inside:
-- <label>...</label>
-- <span>...</span>
-- <div class="application-question">...</div>
-- <div class="application-label">...</div>
-- Any element whose innerText ends with ':' or '?'
-
-Then the associated input/select field is typically:
-- The next <input> element
-- Or an <input> sibling within the same parent block
-- Or <textarea> or <select> inside the same container
-
-When you locate a question + field pair:
-Output an auto_answer action:
-
-{{
-  "action": "auto_answer",
-  "selector": "input[name='...'] or css path",
-  "question": "The question text you detected"
-}}
-
-You MUST generate auto_answer for ALL visible questions, even if they are not required.
-
-IMPORTANT: Submit button detection.
-You MUST click a submit button before finish, unless you are blocked by validation or CAPTCHA.
-
-Valid submit button selectors include ANY of:
-- button[type='submit']
-- button:has-text("Apply")
-- button:has-text("Submit")
-- button[class*="apply"]
-- button[data-qa*="apply"]
-- input[type="submit"]
-
-Click at least one of these before returning a finish action.
+Before finishing you must click one submit style button unless validation errors or captcha blocks it.
 
 Allowed actions (JSON only):
+
 - {{"action": "goto", "url": "..."}}
 - {{"action": "fill", "selector": "...", "value": "..."}}
 - {{"action": "upload", "selector": "...", "value": "<cv>"}}
@@ -293,22 +453,14 @@ Allowed actions (JSON only):
 - {{"action": "finish", "status": "...", "message": "..."}}
 - {{"action": "auto_answer", "selector": "...", "question": "..."}}
 
-Current Page URL:
-{current_url}
-
-Cover Letter:
-{cover_letter}
-
-HTML:
+HTML of the current page:
 {truncated_html}
 
-Plan your next actions to navigate to the /apply page, fill all fields,
-answer all questions, upload the CV using "<cv>", and click submit.
-Then return a finish action.
+Plan the next small sequence of actions that moves the application closer to fully submitted.
+Then end with a finish action.
 """
 
         try:
-            # Hard timeout so the agent cannot hang forever
             response = await asyncio.wait_for(
                 client.chat.completions.create(
                     model="gpt-4.1-mini",
@@ -317,7 +469,6 @@ Then return a finish action.
                 timeout=12,
             )
         except asyncio.TimeoutError:
-            # If the model stalls, request a retry
             return [
                 {
                     "action": "finish",
@@ -333,6 +484,8 @@ Then return a finish action.
             actions = json.loads(cleaned)
             if isinstance(actions, dict):
                 actions = [actions]
+            if not isinstance(actions, list):
+                raise ValueError("Agent did not return a list")
             return actions
         except Exception:
             return [
@@ -343,10 +496,18 @@ Then return a finish action.
                 }
             ]
 
-    # ----------------------------------------------------------------------
-    # EXECUTE BROWSER ACTIONS (WITH auto_answer SUPPORT + HUMANISATION)
-    # ----------------------------------------------------------------------
-    async def execute_actions(self, page, actions, cv_path, ai_data, profile_answers, state):
+    # ============================================================
+    # Execute actions
+    # ============================================================
+    async def execute_actions(
+        self,
+        page,
+        actions: List[Dict[str, Any]],
+        cv_path: str,
+        ai_data: dict,
+        profile_answers: dict,
+        state: dict,
+    ) -> bool:
         for step in actions:
             action = step.get("action")
 
@@ -368,10 +529,9 @@ Then return a finish action.
                 if not sel:
                     continue
 
-                lower_sel = sel.lower()
+                sel_lower = sel.lower()
 
-                # In test mode skip submit clicks
-                if self.test_mode and ("submit" in lower_sel or "apply" in lower_sel):
+                if self.test_mode and ("submit" in sel_lower or "apply" in sel_lower):
                     print("[TEST MODE] Skipping submit click:", sel)
                     continue
 
@@ -382,7 +542,7 @@ Then return a finish action.
                     await self.move_mouse_to_locator(page, locator)
                     await self.human_sleep(0.2, 0.7)
                     await locator.click()
-                    if "submit" in lower_sel or "apply" in lower_sel:
+                    if "submit" in sel_lower or "apply" in sel_lower:
                         state["submit_clicked"] = True
                 except Exception:
                     continue
@@ -401,21 +561,40 @@ Then return a finish action.
                     except Exception:
                         continue
 
-            # Agent provided smart answers
-            elif action == "auto_answer":
+            elif action == "select":
                 sel = step.get("selector")
-                question = step.get("question")
-                if sel:
-                    answer = self.answer_question(question, ai_data, profile_answers)
+                val = step.get("value")
+                if sel and val is not None:
                     try:
                         locator = page.locator(sel)
                         await locator.scroll_into_view_if_needed()
                         await self.human_sleep(0.3, 0.9)
                         await self.move_mouse_to_locator(page, locator)
                         await self.human_sleep(0.2, 0.6)
-                        await self.human_type(locator, answer)
+                        await locator.select_option(val)
                     except Exception:
                         continue
+
+            elif action == "auto_answer":
+                sel = step.get("selector")
+                question = step.get("question")
+                if not sel:
+                    continue
+
+                # Use provided value if present, otherwise recalc
+                answer = step.get("value")
+                if answer is None:
+                    answer = self.answer_question(question, ai_data, profile_answers)
+
+                try:
+                    locator = page.locator(sel)
+                    await locator.scroll_into_view_if_needed()
+                    await self.human_sleep(0.3, 0.9)
+                    await self.move_mouse_to_locator(page, locator)
+                    await self.human_sleep(0.2, 0.6)
+                    await self.human_type(locator, answer)
+                except Exception:
+                    continue
 
             elif action == "upload":
                 sel = step.get("selector")
@@ -448,11 +627,10 @@ Then return a finish action.
 
         return False
 
-    # ----------------------------------------------------------------------
-    # MAIN APPLY LOGIC
-    # ----------------------------------------------------------------------
+    # ============================================================
+    # Main apply flow
+    # ============================================================
     async def apply(self, job, user, cv_path):
-
         job_url = (
             job.get("apply_url")
             or job.get("job_url")
@@ -467,7 +645,6 @@ Then return a finish action.
             or "Thank you for considering my application."
         )
 
-        # CV JSON variant
         ai_raw = user.get("ai_cv_data")
         if isinstance(ai_raw, str):
             try:
@@ -477,7 +654,6 @@ Then return a finish action.
         else:
             ai_data = ai_raw or {}
 
-        # Stored answers
         raw = user.get("application_data")
         if not raw:
             profile_answers = {}
@@ -505,7 +681,6 @@ Then return a finish action.
                 browser = await p.chromium.launch(**launch_args)
 
                 try:
-                    # Use a real browser context with user agent and viewport
                     context = await browser.new_context(
                         user_agent=user_agent,
                         viewport={"width": 1366, "height": 768},
@@ -517,11 +692,9 @@ Then return a finish action.
                     await page.goto(job_url, timeout=60000)
                     await page.wait_for_load_state("domcontentloaded")
                     await self.human_sleep(0.8, 1.6)
-
-                    # Small initial scroll to look more human
                     await self.random_scroll(page)
 
-                    # Try pre navigation to apply page
+                    # Move to apply url if visible
                     try:
                         apply_link = page.locator("a.postings-btn[href*='/apply']")
                         if await apply_link.count() > 0:
@@ -542,20 +715,25 @@ Then return a finish action.
                         "agent_finish_message": None,
                     }
 
-                    # ----------------------------------------------------
-                    # MULTI CYCLE AGENT CONTROL LOOP (BOUNDED)
-                    # ----------------------------------------------------
+                    # Control loop: deterministic answers plus GPT navigation
                     for _ in range(4):
                         html = await page.content()
                         current_url = page.url
 
-                        actions = await self.call_agent(
+                        deterministic_actions = self.build_deterministic_actions(
+                            html, ai_data, profile_answers
+                        )
+
+                        gpt_actions = await self.call_agent(
                             html=html,
                             current_url=current_url,
                             ai_data=ai_data,
                             profile_answers=profile_answers,
                             cover_letter=cover_letter,
+                            state=state,
                         )
+
+                        actions = deterministic_actions + gpt_actions
 
                         finished = await self.execute_actions(
                             page, actions, cv_path, ai_data, profile_answers, state
@@ -566,123 +744,63 @@ Then return a finish action.
 
                         await self.human_sleep(0.8, 1.5)
 
-                    # ----------------------------------------------------
-                    # HYBRID CV UPLOAD FALLBACK
-                    # ----------------------------------------------------
+                    # Hybrid resume upload fallback
                     if not state["cv_uploaded"]:
-
                         uploaded_by_browser = False
 
                         try:
                             file_input = page.locator(
-                                "input[type='file'], input[name*='resume'], input[id*='resume']"
+                                "input[type='file'], "
+                                "input[name='resume'], "
+                                "input[name*='resume'], "
+                                "input[id*='resume']"
                             )
 
                             if await file_input.count() > 0:
-
-                                await file_input.first.scroll_into_view_if_needed()
+                                target = file_input.first
+                                await target.scroll_into_view_if_needed()
                                 await self.human_sleep(0.5, 1.0)
 
-                                box = await file_input.first.bounding_box()
-
+                                box = await target.bounding_box()
                                 if box:
-                                    # Human-like move near the element
                                     await self.human_mouse_move(
                                         page,
                                         box["x"] + random.randint(5, 20),
                                         box["y"] + random.randint(5, 15),
                                         steps=random.randint(14, 25),
                                     )
-
                                     await self.human_sleep(0.4, 1.0)
-
-                                    # Human click
                                     await page.mouse.down()
                                     await asyncio.sleep(random.uniform(0.05, 0.25))
                                     await page.mouse.up()
-
                                     await self.human_sleep(0.6, 1.3)
 
-                                # Now upload the file
-                                await file_input.first.set_input_files(cv_path)
+                                await target.set_input_files(cv_path)
                                 state["cv_uploaded"] = True
+                                uploaded_by_browser = True
 
                         except Exception as e:
-                            print("[LeverBot] Humanized CV upload failed:", e)
+                            print("[LeverBot] Human style CV upload failed:", e)
 
-                        # 2. Backend /parseResume upload only if browser upload didn't work
-                        if not uploaded_by_browser and False:
-                            try:
-                                account_id = await page.locator("input[name='accountId']").input_value()
-                                profile = await self.upload_resume_to_lever(cv_path, account_id)
-                                resume_id = profile.get("resumeStorageId")
+                        # Backend parseResume path kept disabled for now
+                        # to avoid complexity and risk of mismatch
 
-                                if not resume_id:
-                                    raise Exception("No resumeStorageId returned")
-
-                                print("[LeverBot] Backend /parseResume upload succeeded.")
-
-                                # 3. Check if hidden input is writable BEFORE trying to fill it
-                                try:
-                                    is_editable = await page.evaluate("""
-                                        const el = document.querySelector("input[name='resumeStorageId']");
-                                        if (!el) return false;
-                                        return !el.disabled && !el.readOnly && el.offsetParent !== null;
-                                    """)
-                                except Exception:
-                                    is_editable = False
-
-                                # 4. If editable, fill the hidden field (your chosen behavior)
-                                if is_editable:
-                                    try:
-                                        await page.fill("input[name='resumeStorageId']", resume_id)
-                                        print("[LeverBot] resumeStorageId field updated successfully.")
-                                        state["cv_uploaded"] = True
-                                    except Exception as e:
-                                        print(f"[LeverBot] Hidden field fill failed (skipped): {e}")
-                                else:
-                                    print("[LeverBot] resumeStorageId input not editable — skipping fill.")
-
-                                # 5. Fill name/email/phone IF blank
-                                async def set_if_empty(sel, val):
-                                    if not val:
-                                        return
-                                    loc = page.locator(sel)
-                                    if await loc.count() == 0:
-                                        return
-                                    curr = await loc.input_value()
-                                    if not curr.strip():
-                                        await loc.fill(val)
-
-                                await set_if_empty("input[name='name']", profile.get("name"))
-                                await set_if_empty("input[name='email']", profile.get("email"))
-                                await set_if_empty("input[name='phone']", profile.get("phone"))
-
-                            except Exception as e:
-                                print(f"[LeverBot] Backend CV upload failed: {e}")
-
-                    # ----------------------------------------------------
-                    # FINAL VALIDATION AND CAPTCHA AVOIDANCE CHECKS
-                    # ----------------------------------------------------
                     final_url = page.url
                     screenshot_path = f"/tmp/lever_agent_{user.get('user_id')}_{job.get('id')}.png"
                     screenshot_url = None
 
                     try:
                         await page.screenshot(path=screenshot_path, full_page=True)
-                        screenshot_url = upload_to_s3(screenshot_path, folder="screenshots")
+                        screenshot_url = upload_to_s3(
+                            screenshot_path, folder="screenshots"
+                        )
                     except Exception:
                         pass
 
-                    # Test mode: never actually apply
                     if self.test_mode:
                         return ApplyResult("success", "Test mode complete", screenshot_url)
 
-                    # Basic reach check
-                    if "/apply" not in final_url:
-                        return ApplyResult("retry", "Did not reach apply page", screenshot_url)
-
-                    # CAPTCHA detection, avoid false success
+                    # Captcha detection
                     try:
                         captcha_present = (
                             await page.locator("iframe[title*='captcha']").count() > 0
@@ -693,25 +811,38 @@ Then return a finish action.
                         captcha_present = False
 
                     if captcha_present:
-                        return ApplyResult("retry", "CAPTCHA detected on Lever page", screenshot_url)
+                        return ApplyResult(
+                            "retry", "CAPTCHA detected on Lever page", screenshot_url
+                        )
 
                     if not state["submit_clicked"]:
-                        return ApplyResult("retry", "Submit button never clicked", screenshot_url)
+                        return ApplyResult(
+                            "retry", "Submit button never clicked", screenshot_url
+                        )
 
                     if not state["cv_uploaded"]:
-                        return ApplyResult("retry", "CV not uploaded", screenshot_url)
+                        return ApplyResult(
+                            "retry", "CV not uploaded", screenshot_url
+                        )
 
                     # Confirmation detection
                     try:
                         thank_you_count = await page.locator("text=Thank you").count()
+                        thanks_apply_count = await page.locator(
+                            "text=Thanks for applying"
+                        ).count()
                     except Exception:
                         thank_you_count = 0
+                        thanks_apply_count = 0
 
-                    if thank_you_count == 0:
-                        return ApplyResult("retry", "No confirmation detected after submit", screenshot_url)
+                    if thank_you_count == 0 and thanks_apply_count == 0:
+                        return ApplyResult(
+                            "retry",
+                            "No confirmation detected after submit",
+                            screenshot_url,
+                        )
 
-                    msg = "Submitted Lever application (confirmation detected)"
-
+                    msg = "Submitted Lever application, confirmation detected"
                     return ApplyResult("success", msg, screenshot_url)
 
                 finally:
