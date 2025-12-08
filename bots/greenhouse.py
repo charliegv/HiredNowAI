@@ -10,11 +10,46 @@ from openai import AsyncOpenAI
 from bots.base import BaseATSBot, ApplyResult
 from utils.s3_uploader import upload_to_s3  # noqa: F401 (kept for parity with other bots)
 from dotenv import load_dotenv
+import random
+import secrets
+
 
 load_dotenv()
 
 
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+HUMAN_USER_AGENTS = [
+    # Latest real Chrome UAs
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.85 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.85 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13.5; rv:132.0) Gecko/20100101 Firefox/132.0",
+]
+
+def random_user_agent():
+    return random.choice(HUMAN_USER_AGENTS)
+
+def random_viewport():
+    return {
+        "width": random.randint(1360, 1920),
+        "height": random.randint(768, 1080)
+    }
+
+def random_fingerprint():
+    return {
+        "user_agent": random_user_agent(),
+        "viewport": random_viewport(),
+        "timezone": random.choice([
+            "Europe/London", "Europe/Paris", "America/New_York", "America/Chicago"
+        ]),
+        "locale": random.choice(["en-GB", "en-US"]),
+        "platform": random.choice(["Win32", "MacIntel"]),
+        "hardware_concurrency": random.randint(4, 12),
+        "device_memory": random.choice([4, 8, 16]),
+        "do_not_track": random.choice(["1", "0", None])
+    }
+
 
 
 class GreenhouseBot(BaseATSBot):
@@ -25,6 +60,21 @@ class GreenhouseBot(BaseATSBot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        proxy_file = os.getenv("PROXY_FILE", "/mnt/data/Webshare_1000_proxies.txt")
+
+        if os.path.exists(proxy_file):
+            with open(proxy_file, "r") as f:
+                self.proxies = [line.strip() for line in f if line.strip()]
+        else:
+            self.proxies = []
+
+        self.user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        ]
+
+        self.test_mode = os.getenv("TEST_MODE", "false").lower() == "true"
         self.show_browser = os.getenv("SHOW_BROWSER", "false").lower() == "true"
         self.debug = (
             os.getenv("GREENHOUSE_DEBUG", "false").lower() == "true"
@@ -40,7 +90,31 @@ class GreenhouseBot(BaseATSBot):
         if self.debug:
             print(f"[Greenhouse DEBUG] {message}")
 
+    def pick_proxy(self):
+        if not self.proxies:
+            return None
 
+        raw = random.choice(self.proxies)
+        parts = raw.split(":")
+
+        # user:pass proxies
+        if len(parts) == 4:
+            ip, port, user, password = parts
+            return {
+                "server": f"http://{ip}:{port}",
+                "username": user,
+                "password": password,
+            }
+
+        # IP:PORT only
+        if len(parts) == 2:
+            ip, port = parts
+            return {"server": f"http://{ip}:{port}"}
+
+        return None
+
+    def pick_user_agent(self):
+        return random.choice(self.user_agents)
 
     def g(self, obj, field: str, default=None):
         """
@@ -433,6 +507,81 @@ class GreenhouseBot(BaseATSBot):
 
         return national
 
+    async def human_click(self, element):
+        """Human-like click with slight randomness"""
+        try:
+            box = await element.bounding_box()
+            if box:
+                x = box["x"] + random.uniform(5, box["width"] - 5)
+                y = box["y"] + random.uniform(5, box["height"] - 5)
+                await element.page.mouse.move(x, y, steps=random.randint(8, 18))
+                await asyncio.sleep(random.uniform(0.08, 0.22))
+                await element.page.mouse.click(x, y, delay=random.randint(30, 120))
+            else:
+                await element.click()
+        except:
+            await element.click()
+
+    async def human_type_text(self, element, text):
+        """Simulated human typing into a text or textarea field"""
+        await self.human_click(element)
+
+        # Clear any pre-filled text
+        try:
+            await element.fill("")
+            await asyncio.sleep(random.uniform(0.1, 0.25))
+        except:
+            pass
+
+        for ch in text:
+            await element.type(ch, delay=random.randint(40, 120))
+
+            # Random mid-word pause
+            if random.random() < 0.05:
+                await asyncio.sleep(random.uniform(0.2, 0.5))
+
+            # Occasional backspace + retype
+            if random.random() < 0.03:
+                await element.press("Backspace")
+                await asyncio.sleep(random.uniform(0.05, 0.15))
+                await element.type(ch, delay=random.randint(60, 140))
+
+        await asyncio.sleep(random.uniform(0.2, 0.6))
+
+    async def human_scroll_focus(self, element):
+        """Scroll the page slightly to simulate reading behaviour"""
+        try:
+            page = element.page
+            delta = random.randint(120, 380)
+            await page.mouse.wheel(0, delta)
+            await asyncio.sleep(random.uniform(0.15, 0.4))
+        except:
+            pass
+
+    async def human_sleep(self, min_s=0.4, max_s=1.2):
+        await asyncio.sleep(random.uniform(min_s, max_s))
+
+    async def random_scroll(self, page):
+        try:
+            delta = random.randint(200, 700)
+            await page.mouse.wheel(0, delta)
+            await self.human_sleep(0.2, 0.7)
+        except:
+            pass
+
+    async def human_type(self, locator, text):
+        try:
+            await locator.click()
+        except:
+            pass
+        try:
+            await locator.fill("")
+        except:
+            pass
+
+        for ch in text:
+            await locator.type(ch, delay=random.randint(40, 120))
+
     # ----------------- frame / form detection -----------------
 
     async def find_greenhouse_frame(self, page):
@@ -665,8 +814,53 @@ class GreenhouseBot(BaseATSBot):
             profile_answers = {}
 
         playwright = await async_playwright().start()
-        browser = await playwright.chromium.launch(headless=not self.should_show_browser())
-        context = await browser.new_context()
+        proxy_config = self.pick_proxy()
+        user_agent = self.pick_user_agent()
+
+        if self.debug:
+            print(f"[Greenhouse DEBUG] Proxy selected: {proxy_config}")
+
+        launch_args = {"headless": not self.show_browser}
+
+        if proxy_config:
+            launch_args["proxy"] = proxy_config
+        if self.show_browser:
+            launch_args["slow_mo"] = 250
+
+        browser = await playwright.chromium.launch(**launch_args)
+
+        fp = random_fingerprint()
+
+        context = await browser.new_context(
+            user_agent=fp["user_agent"],
+            viewport=fp["viewport"],
+            locale=fp["locale"],
+            timezone_id=fp["timezone"],
+
+            # Fake CPU + memory (stealth)
+            device_scale_factor=random.choice([1, 2]),
+            is_mobile=False,
+            java_script_enabled=True,
+        )
+        await context.add_init_script("""
+        Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+        Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+        Object.defineProperty(navigator, 'platform', { get: () => "Win32" });
+        Object.defineProperty(navigator, 'languages', { get: () => ["en-US", "en"] });
+        Object.defineProperty(navigator, 'plugins', { get: () => [1,2,3] });
+
+        // Remove webdriver flag
+        Object.defineProperty(navigator, 'webdriver', { get: () => false });
+
+        // Fake Chrome object
+        window.chrome = { runtime: {} };
+
+        // Remove automation flags
+        delete window.__nightmare;
+        delete window.domAutomation;
+        delete window.domAutomationController;
+        """)
+
         page = await context.new_page()
 
         try:
@@ -675,8 +869,10 @@ class GreenhouseBot(BaseATSBot):
 
             self.log("Waiting briefly for Apply button to render")
             await page.wait_for_timeout(1500)
+            await self.human_sleep(0.4, 1.4)
 
             await self.click_cookie_banners(page)
+            await self.human_sleep(0.4, 1.4)
 
             await page.wait_for_timeout(1500)
 
@@ -686,6 +882,7 @@ class GreenhouseBot(BaseATSBot):
 
             if btn_count > 0:
                 self.log("Clicking Apply button")
+                await self.human_sleep(0.4, 1.4)
                 await apply_btn.first.click()
                 await page.wait_for_timeout(2000)
 
@@ -702,15 +899,21 @@ class GreenhouseBot(BaseATSBot):
             email = ai_data.get("email") or self.g(user, "email", "") or ""
 
             self.log("Filling standard profile fields")
+            await self.human_sleep(0.4, 1.4)
             await self.safe_fill(form, "#first_name", first_name)
+            await self.human_sleep(0.4, 1.4)
             await self.safe_fill(form, "#last_name", last_name)
+            await self.human_sleep(0.4, 1.4)
             await self.safe_fill(form, "#email", email)
+            await self.human_sleep(0.4, 1.4)
 
             self.log("Handling phone field")
             await self.handle_phone(form, ai_data, user)
+            await self.human_sleep(0.4, 1.4)
 
             self.log("Uploading resume")
             await self.handle_resume_upload(form, cv_path)
+            await self.human_sleep(0.4, 1.4)
 
             self.log("Handling custom questions")
             await self.handle_custom_questions(
@@ -728,6 +931,7 @@ class GreenhouseBot(BaseATSBot):
                 "button[type='submit'], input[type='submit'], button:has-text('Submit'), button:has-text('Apply'), input[value*='Apply']"
             )
             if await submit.count() > 0:
+                await self.human_sleep(0.4, 1.4)
                 await submit.first.click()
             else:
                 self.log("Submit button not found")
@@ -1226,15 +1430,18 @@ class GreenhouseBot(BaseATSBot):
             # ------------------------------------------------------------
             try:
                 if tag == "input" and (etype in ["text", None, "search", "tel", "url", "email"]):
-                    await element.fill(str(answer))
+                    await self.human_scroll_focus(element)
+                    await self.human_type_text(element, str(answer))
 
                 elif tag == "textarea":
-                    await element.fill(str(answer))
+                    await self.human_scroll_focus(element)
+                    await self.human_type_text(element, str(answer))
 
                 elif tag == "input" and etype == "number":
                     num = self.pick_numeric_value(str(answer))
+                    await self.human_scroll_focus(element)
+                    await self.human_type_text(element, str(num))
                     self.log(f"Using numeric answer: {num}")
-                    await element.fill(str(num))
 
                 elif tag == "select":
                     self.log("Selecting option for <select>")
@@ -1276,6 +1483,8 @@ class GreenhouseBot(BaseATSBot):
                     #
                     # if should_check:
                     self.log(f"Checking single checkbox for '{label}'")
+                    await self.human_scroll_focus(element)
+                    await self.human_sleep(0.2, 0.45)
                     await element.check()
 
                     continue
@@ -1283,6 +1492,8 @@ class GreenhouseBot(BaseATSBot):
 
                 elif tag == "input" and etype == "radio":
                     self.log("Selecting radio option")
+                    await self.human_scroll_focus(element)
+                    await self.human_sleep(0.2, 0.45)
                     await element.check()
 
             except Exception as e:
@@ -1312,6 +1523,8 @@ class GreenhouseBot(BaseATSBot):
             choice = random.choice(values)
             self.log(f"Selecting option: {choice}")
             try:
+                await self.human_scroll_focus(select_element)
+                await self.human_sleep(0.2, 0.5)
                 await select_element.select_option(choice)
             except Exception as e:
                 self.log(f"Failed to select option {choice}: {e}")
