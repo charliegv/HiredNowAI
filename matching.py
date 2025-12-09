@@ -145,6 +145,16 @@ def match_user(conn, user_id: int, limit=200):
 
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.itersize = 2000
+        # cur.execute("""
+        #     SELECT
+        #         id, job_url, title, description, city, state, country,
+        #         latitude, longitude, is_remote, salary_min, salary_max,
+        #         title_embedding, desc_embedding, company, posted_at
+        #     FROM jobs
+        #     WHERE (country=%s OR is_remote=true)
+        #       AND expires_at >= NOW()
+        #       and (source_ats = 'workable' or (source_ats = 'greenhouse' and job_url like '%%job-boards.greenhouse%%'))
+        # """, (profile["country"],))
         cur.execute("""
             SELECT
                 id, job_url, title, description, city, state, country,
@@ -153,7 +163,7 @@ def match_user(conn, user_id: int, limit=200):
             FROM jobs
             WHERE (country=%s OR is_remote=true)
               AND expires_at >= NOW()
-              and (source_ats = 'workable' or (source_ats = 'greenhouse' and job_url like '%%job-boards.greenhouse%%'))
+              and source_ats = 'workable'
         """, (profile["country"],))
 
         for job in cur:
