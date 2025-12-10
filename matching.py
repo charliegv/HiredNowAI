@@ -9,9 +9,30 @@ from psycopg2.extras import RealDictCursor
 from openai import OpenAI
 from dotenv import load_dotenv
 
+import heapq
+
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+MIN_SCORE_THRESHOLD = 0.20
+
+# --------------------------------------------------------
+# NEW - Extract job titles cleanly (handles comma lists)
+# --------------------------------------------------------
+def extract_titles(raw: Optional[str]) -> List[str]:
+    """
+    Accepts:
+      - a single title ("Product Manager")
+      - a comma-separated list ("Product Manager, Product Owner")
+    Returns a clean list: ["product manager", "product owner"]
+    """
+    if not raw:
+        return []
+
+    raw = raw.strip()
+    titles = [t.strip().lower() for t in raw.split(",") if t.strip()]
+    return titles
 
 
 # -----------------------------
@@ -36,7 +57,6 @@ def cosine_similarity(a: List[float], b: List[float]) -> float:
 
 
 def parse_emb(val):
-    """Parse embeddings safely regardless of type."""
     if val is None:
         return None
     if isinstance(val, list):
@@ -97,10 +117,16 @@ def generate_embedding(text: str):
     return resp.data[0].embedding
 
 
-# ----------------------------------------------------------------
-# MAIN MATCHING (STREAMING + PARSED EMBEDDINGS + LOW MEMORY)
-# ----------------------------------------------------------------
+# --------------------------------------------------------
+# MAIN MATCH FUNCTION
+# --------------------------------------------------------
 def match_user(conn, user_id: int, limit=200):
+    import itertools
+    counter = itertools.count()
+
+    # --------------------------------------------------------
+    # Load user profile
+    # --------------------------------------------------------
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("""
             SELECT
@@ -118,9 +144,17 @@ def match_user(conn, user_id: int, limit=200):
 
         profile["country"] = normalize_country(profile["country"])
 
-        # ensure embedding exists
+        # --------------------------------------------------------
+        # NEW — split titles properly
+        # --------------------------------------------------------
+        title_list = extract_titles(profile["job_titles"])  # lowercased list
+
+        # Create a combined string for embedding
+        combined_title_text = " ".join(title_list) if title_list else ""
+
+        # Ensure embedding exists
         if profile["preference_embedding"] is None:
-            emb = generate_embedding(profile["job_titles"] or "")
+            emb = generate_embedding(combined_title_text)
             cur.execute(
                 "UPDATE profile SET preference_embedding=%s WHERE id=%s",
                 (emb, profile["profile_id"])
@@ -130,31 +164,24 @@ def match_user(conn, user_id: int, limit=200):
 
         user_emb = profile["preference_embedding"]
 
-    # --------------------------
-    # STREAM JOBS INSTEAD OF LOADING ALL
-    # --------------------------
-    scored = []
-    keywords = [
-        k.strip().lower()
-        for k in (profile["job_titles"] or "").split(",")
-        if k.strip()
-    ]
+    # --------------------------------------------------------
+    # COMBINED keyword list
+    # --------------------------------------------------------
+    keywords = title_list  # Already cleaned and lowercased
 
     max_miles = profile.get("miles_distance")
-    max_km = max_miles * 1.60934 if max_miles and max_miles > 0 else None
+    max_km = max_miles * 1.60934 if max_miles else None
 
+    # --------------------------------------------------------
+    # Min heap for top N matches
+    # --------------------------------------------------------
+    heap = []
+
+    # --------------------------------------------------------
+    # Job stream
+    # --------------------------------------------------------
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.itersize = 2000
-        # cur.execute("""
-        #     SELECT
-        #         id, job_url, title, description, city, state, country,
-        #         latitude, longitude, is_remote, salary_min, salary_max,
-        #         title_embedding, desc_embedding, company, posted_at
-        #     FROM jobs
-        #     WHERE (country=%s OR is_remote=true)
-        #       AND expires_at >= NOW()
-        #       and (source_ats = 'workable' or (source_ats = 'greenhouse' and job_url like '%%job-boards.greenhouse%%'))
-        # """, (profile["country"],))
         cur.execute("""
             SELECT
                 id, job_url, title, description, city, state, country,
@@ -163,61 +190,102 @@ def match_user(conn, user_id: int, limit=200):
             FROM jobs
             WHERE (country=%s OR is_remote=true)
               AND expires_at >= NOW()
-              and source_ats = 'workable'
+              AND source_ats='workable'
         """, (profile["country"],))
 
         for job in cur:
-            # distance filter
-            if max_km and not job["is_remote"]:
-                dist = haversine(
-                    profile["latitude"], profile["longitude"],
-                    job["latitude"], job["longitude"]
-                )
-                if dist is None or dist > max_km:
-                    continue
+            # -----------------------------
+            # HARD FILTERING (no scoring yet)
+            # -----------------------------
 
-            # parse embeddings
+            job_country = normalize_country(job["country"])
+
+            # 1 - country filter (unless remote)
+            if not job["is_remote"] and job_country != profile["country"]:
+                continue
+
+            # 2 - distance filter (except remote)
+            if not job["is_remote"]:
+                if max_km:
+                    dist = haversine(profile["latitude"], profile["longitude"],
+                                     job["latitude"], job["longitude"])
+                    if dist is None or dist > max_km:
+                        continue
+
+            # 3 - remote preference logic
+            if job["is_remote"] and not profile["remote_preference"]:
+                # Job is remote but user doesn't want remote
+                # Allow only if it is still within local radius
+                job_country = normalize_country(job["country"])
+
+                # Must be same country
+                if job_country != profile["country"]:
+                    continue
+                if max_km:
+                    dist = haversine(profile["latitude"], profile["longitude"],
+                                     job["latitude"], job["longitude"])
+                    if dist is None or dist > max_km:
+                        continue  # reject remote + far away
+                else:
+                    continue  # no radius defined → reject remote entirely
+
             title_emb = parse_emb(job["title_embedding"])
             desc_emb = parse_emb(job["desc_embedding"])
 
             sem_title = cosine_similarity(user_emb, title_emb) if title_emb else 0.0
             sem_desc  = cosine_similarity(user_emb, desc_emb)  if desc_emb else 0.0
 
-            # keywords
-            kw_score = 0.0
-            t = (job["title"] or "").lower()
-            d = (job["description"] or "").lower()
-            for kw in keywords:
-                if kw in t: kw_score += 0.7
-                elif kw in d: kw_score += 0.4
+            # --------------------------------------------------------
+            # NEW combined keyword logic
+            # Score boosts based on ANY matched title keyword
+            # --------------------------------------------------------
+            job_title_lower = (job["title"] or "").lower()
+            job_desc_lower  = (job["description"] or "").lower()
 
+            kw_score = 0.0
+            for kw in keywords:
+                if kw in job_title_lower:
+                    kw_score += 0.7
+                elif kw in job_desc_lower:
+                    kw_score += 0.4
+
+            # --------------------------------------------------------
+            # Other scores
+            # --------------------------------------------------------
             loc = location_score(profile, job)
             sal = salary_score(profile, job)
-
-            remote_penalty = 0.4 if not profile["remote_preference"] and job["is_remote"] else 0.0
+            remote_penalty = 0.4 if (not profile["remote_preference"] and job["is_remote"]) else 0.0
 
             final_score = (
-                sem_title*0.45 + sem_desc*0.10 + kw_score*0.25
-                + loc*0.12 + sal*0.08 - remote_penalty
+                    sem_title * 0.55 +
+                    sem_desc * 0.15 +
+                    kw_score * 0.20 +
+                    sal * 0.10
             )
 
-            scored.append((final_score, job))
-            # keep memory bounded to N
-            if len(scored) > limit * 3:
-                scored.sort(key=lambda x: x[0], reverse=True)
-                scored = scored[:limit]
+            # print(f"{job_title_lower} - {final_score} - kw_score: {kw_score},  loc: {loc}, sem_title: {sem_title}, sem_desc: {sem_desc}, sal: {sal}, remote_penalty: {remote_penalty}")
 
-    # final sorting
-    scored.sort(key=lambda x: x[0], reverse=True)
-    top_matches = scored[:limit]
+            entry = (final_score, next(counter), job)
+            if len(heap) < limit:
+                heapq.heappush(heap, entry)
+            else:
+                if final_score > heap[0][0]:
+                    heapq.heapreplace(heap, entry)
 
-    # -----------------------------------
-    # Write matches
-    # -----------------------------------
+    # --------------------------------------------------------
+    # Sort results
+    # --------------------------------------------------------
+    top_matches = sorted(heap, key=lambda x: x[0], reverse=True)
+
+    # --------------------------------------------------------
+    # Store matches
+    # --------------------------------------------------------
+    stored_count = 0
     with conn.cursor() as cur:
-        for score, job in top_matches:
-            if score < 0.20:
+        for score, _, job in top_matches:
+            if score < MIN_SCORE_THRESHOLD:
                 continue
+
             cur.execute("""
                 INSERT INTO matches (user_id, job_url, job_id, score, is_remote)
                 VALUES (%s, %s, %s, %s, %s)
@@ -234,7 +302,11 @@ def match_user(conn, user_id: int, limit=200):
                 score,
                 job["is_remote"],
             ))
+            stored_count += 1
 
     conn.commit()
-    print(f"[MATCH] Stored {len(top_matches)} matches for user {user_id}")
+
+    print(f"[MATCH] Found {len(top_matches)} matches in area for user {user_id}")
+    print(f"[MATCH] Stored {stored_count} matches above matching threshold")
+
     return top_matches
