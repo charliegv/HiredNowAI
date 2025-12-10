@@ -76,8 +76,8 @@ def get_bot(ats_type):
     return bots.get(ats_type.lower())
 
 
-async def download_cv_to_tmp(cv_url: str) -> str:
-    filename = f"/tmp/{uuid.uuid4()}.docx"
+async def download_cv_to_tmp(cv_url: str, custom_cv_name) -> str:
+    filename = f"/tmp/{custom_cv_name}"
 
     async with aiohttp.ClientSession() as session:
         try:
@@ -255,7 +255,7 @@ async def worker_loop():
             # 5 - Apply ONCE
             # 5 - Download S3 CV variant to /tmp
             try:
-                local_cv_path = await download_cv_to_tmp(cv_url)
+                local_cv_path = await download_cv_to_tmp(cv_url, custom_cv_name)
             except Exception as e:
                 await mark_retry(pool, app_id, f"CV download failed: {str(e)}")
                 continue
