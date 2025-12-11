@@ -1,7 +1,17 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_user, logout_user, login_required
 from flask_bcrypt import Bcrypt
 from models import db, User, Profile
+from itsdangerous import URLSafeTimedSerializer
+import requests
+import os
+from dotenv import load_dotenv
+from datetime import datetime
+
+load_dotenv()
+
+MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN")
+MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
 
 auth = Blueprint('auth', __name__)
 bcrypt = Bcrypt()
@@ -57,3 +67,89 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for("auth.login"))
+
+
+
+def generate_reset_token(email):
+    s = URLSafeTimedSerializer(current_app.secret_key)
+    return s.dumps(email, salt="password-reset")
+
+def confirm_reset_token(token, expiration=3600):
+    s = URLSafeTimedSerializer(current_app.secret_key)
+    try:
+        return s.loads(token, salt="password-reset", max_age=expiration)
+    except Exception:
+        return None
+
+
+
+def send_reset_email(email, token):
+    reset_url = url_for("auth.reset_password", token=token, _external=True)
+
+    html_body = render_template(
+        "emails/reset_password_email.html",
+        reset_url=reset_url,
+        year=datetime.utcnow().year
+    )
+
+    text_body = f"""
+	Reset your HiredNow AI password
+	
+	Click the link below to create a new password:
+	{reset_url}
+	
+	If you did not request this, you can ignore this message.
+	This link expires in 1 hour.
+	"""
+
+    return requests.post(
+        f"https://api.eu.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
+        auth=("api", MAILGUN_API_KEY),
+        data={
+            "from": f"HiredNow AI <no-reply@{MAILGUN_DOMAIN}>",
+            "to": [email],
+            "subject": "Reset your password",
+            "text": text_body,
+            "html": html_body,
+        }
+    )
+
+@auth.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email")
+        user = User.query.filter_by(email=email).first()
+
+        if user:
+            token = generate_reset_token(email)
+            send_reset_email(email, token)
+            flash("A password reset link has been sent to your email.", "success")
+        else:
+            flash("If that email exists, you will receive a reset link.", "info")
+
+        return redirect(url_for("auth.forgot_password"))
+
+    return render_template("forgot_password.html")
+
+
+@auth.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    email = confirm_reset_token(token)
+    if not email:
+        flash("This password reset link has expired or is invalid.", "error")
+        return redirect(url_for("auth.login"))
+
+    if request.method == "POST":
+        password = request.form.get("password")
+        user = User.query.filter_by(email=email).first()
+
+        if user:
+            user.password_hash = bcrypt.generate_password_hash(password).decode()
+            db.session.commit()
+            flash("Your password has been reset. You can now log in.", "success")
+            return redirect(url_for("auth.login"))
+
+    return render_template("reset_password.html", token=token)
+
+
+

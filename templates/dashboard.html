@@ -31,6 +31,8 @@
     </p>
   </div>
 
+
+
   <!-- TOP ACTION BAR -->
   <div class="flex flex-wrap gap-3 mb-10">
 
@@ -51,7 +53,29 @@
 
   </div>
 
-  <!-- STATS GRID -->
+
+        <!-- METRICS SECTION -->
+<div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-10">
+
+  <div class="flex items-center justify-between cursor-pointer"
+       onclick="toggleMetrics()">
+    <h2 class="text-xl font-semibold text-gray-900">Metrics</h2>
+
+    <span id="metricsToggleIcon" class="text-gray-500 text-xl">+</span>
+  </div>
+
+  <div id="metricsPanel" class="mt-6 hidden">
+    <p class="text-gray-600 text-sm mb-4">
+      Applications successfully submitted per day (last 60 days)
+    </p>
+
+      <div class="w-full h-64">
+  <canvas id="metricsChart"></canvas>
+
+    </div>
+  </div>
+</div>
+    <!-- STATS GRID -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
 
     <!-- Applications sent -->
@@ -627,42 +651,100 @@
   </div>
 
   <!-- AUTOMATION STATUS -->
-  <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
-    <h2 class="text-xl font-semibold text-gray-900 mb-4">
-      Application automation
-    </h2>
+  <!-- APPLICATION AUTOMATION -->
+<div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
 
-    <div class="flex items-center mb-3">
-      <div class="h-3 w-3 rounded-full
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-xl font-semibold text-gray-900">Application automation</h2>
+
+    <!-- Running indicator -->
+    <div class="flex items-center gap-2">
+      <span class="h-3 w-3 rounded-full
+        {% if automation_running %} bg-green-500 {% else %} bg-red-500 {% endif %}">
+      </span>
+      <span class="text-sm text-gray-700">
         {% if automation_running %}
-          bg-green-500
+          Active
         {% else %}
-          bg-red-500
+          Paused (Approval Mode)
         {% endif %}
-        mr-2">
-      </div>
+      </span>
+    </div>
+  </div>
 
-      <p class="text-gray-700">
-        {% if automation_running %}
-          Automation is active and applying {{ profile.application_frequency }}.
+  <!-- QUICK SUMMARY ROW -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+
+    <!-- Application Mode -->
+    <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+      <p class="text-gray-500 text-xs mb-1">Application Mode</p>
+      <p class="font-semibold text-gray-900 capitalize">{{ profile.application_mode }}</p>
+    </div>
+
+
+    <!-- Matching Mode -->
+    <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+      <p class="text-gray-500 text-xs mb-1">Match Strictness</p>
+      <p class="font-semibold text-gray-900 capitalize">{{ profile.match_mode }}</p>
+    </div>
+
+  </div>
+
+
+  <!-- LOCATION & REMOTE PREFERENCES -->
+  <h3 class="text-lg font-semibold text-gray-900 mb-3">Your job search radius</h3>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+
+    <!-- Remote type -->
+    <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+      <p class="text-gray-500 text-xs mb-1">Remote Preference</p>
+
+      {% if not profile.remote_preference %}
+        <p class="font-semibold text-gray-900">No remote (local only)</p>
+
+      {% elif profile.remote_preference and not profile.worldwide_remote %}
+        <p class="font-semibold text-gray-900">Remote – Nationwide only</p>
+
+      {% elif profile.worldwide_remote %}
+        <p class="font-semibold text-gray-900">Remote – Worldwide</p>
+      {% endif %}
+    </div>
+
+    <!-- Distance radius -->
+    <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+      <p class="text-gray-500 text-xs mb-1">Local Search Radius</p>
+      <p class="font-semibold text-gray-900">
+                  {% if profile.miles_distance == 5000  %}
+          Nationwide
+          {% elif profile.miles_distance %}
+          {{ profile.miles_distance }} miles
+
         {% else %}
-          Automation is currently paused.
+          Not set
         {% endif %}
       </p>
     </div>
 
-    <div class="text-sm text-gray-600 mt-2">
-      Applying mode:
-      <strong>{{ profile.application_mode }}</strong><br>
-      Matching mode:
-      <strong>{{ profile.match_mode }}</strong>
+    <!-- User location -->
+    <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+      <p class="text-gray-500 text-xs mb-1">Your Location</p>
+      <p class="font-semibold text-gray-900">
+        {{ profile.city }},
+        {% if profile.state %}{{ profile.state }},{% endif %}
+        {{ profile.country }}
+      </p>
     </div>
 
-    <a href="{{ url_for('preferences.preferences_page') }}"
-       class="mt-4 inline-block text-primary hover:underline text-sm">
-      Change settings
-    </a>
   </div>
+
+  <!-- CTA -->
+  <a href="{{ url_for('preferences.preferences_page') }}"
+     class="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full shadow font-medium transition">
+    Adjust settings
+  </a>
+</div>
+
 
 </div>
 
@@ -774,5 +856,58 @@ async function completeManualApply(appId) {
   alert("Application marked as manually completed.");
 }
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+function toggleMetrics() {
+  const panel = document.getElementById("metricsPanel");
+  const icon = document.getElementById("metricsToggleIcon");
+
+  panel.classList.toggle("hidden");
+  icon.textContent = panel.classList.contains("hidden") ? "+" : "-";
+
+  // Render only after panel becomes visible
+  if (!window.metricsLoaded && !panel.classList.contains("hidden")) {
+      setTimeout(() => {
+          loadMetrics();
+          window.metricsLoaded = true;
+      }, 80); // small delay fixes zero-size canvas issue
+  }
+}
+
+async function loadMetrics() {
+  const res = await fetch("/dashboard/metrics");
+  const data = await res.json();
+
+  const ctx = document.getElementById("metricsChart").getContext("2d");
+
+  new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label: "Successful Applications",
+        data: data.values,
+        borderColor: "#2563eb",
+        backgroundColor: "rgba(37, 99, 235, 0.15)",
+        borderWidth: 2,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: "#2563eb"
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+</script>
+
 
 {% endblock %}

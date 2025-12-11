@@ -1,13 +1,14 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+
+<div class="max-w-3xl mx-auto bg-white p-10 rounded-2xl shadow-md">
 
   <!-- Header -->
-  <div class="mb-6">
-    <h1 class="text-2xl font-semibold text-gray-900">Your preferences</h1>
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Your Preferences</h1>
     <p class="text-gray-600 text-sm mt-1">
-      Tell HiredNow AI how and where you want to work so we can target the right roles for you.
+      Update how HiredNow AI searches and applies for roles on your behalf.
     </p>
   </div>
 
@@ -15,222 +16,258 @@
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}
-        <div class="mb-4 p-3 rounded-md
+        <div class="mb-4 p-3 rounded-xl text-sm font-medium
           {% if category == 'error' %}
             bg-red-100 text-red-700
           {% else %}
             bg-green-100 text-green-700
-          {% endif %}
-        ">
+          {% endif %}">
           {{ message }}
         </div>
       {% endfor %}
     {% endif %}
   {% endwith %}
 
-  <form method="POST" enctype="multipart/form-data" class="space-y-8">
+  <!-- FORM START -->
+  <form method="POST" class="space-y-12">
 
     <!-- APPLICATION MODE -->
-<section>
-  <h2 class="text-xl font-semibold mb-2">Application mode</h2>
-  <p class="text-gray-500 text-sm mb-4">
-    Choose whether HiredNow AI applies automatically, or waits for your approval.
-  </p>
+    <section>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Application mode</h2>
+      <p class="text-gray-600 text-sm mb-4">
+        Choose whether HiredNow AI applies automatically or waits for your approval.
+      </p>
 
-  <select name="application_mode"
-          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600">
+      <select name="application_mode"
+              class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-600">
+        <option value="auto" {% if profile.application_mode == "auto" %}selected{% endif %}>Auto-apply</option>
+        <option value="approval" {% if profile.application_mode == "approval" %}selected{% endif %}>Approval required</option>
+      </select>
+    </section>
 
-    <option value="auto" {% if profile.application_mode == "auto" %}selected{% endif %}>Auto-apply</option>
-    <option value="approval" {% if profile.application_mode == "approval" %}selected{% endif %}>Approval required</option>
+    <!-- MATCH MODE -->
+    <section>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Matching strictness</h2>
+      <p class="text-gray-600 text-sm mb-4">
+        Control how strict or broad your job recommendations should be.
+      </p>
 
-  </select>
-</section>
-
-<!-- MATCHING STRICTNESS -->
-<section>
-  <h2 class="text-xl font-semibold mb-2">Job match strictness</h2>
-  <p class="text-gray-500 text-sm mb-4">
-    Control how narrow or broad your recommended job matches should be.
-  </p>
-
-  <select name="match_mode"
-          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600">
-
-    <option value="safe" {% if profile.match_mode == "safe" %}selected{% endif %}>Safe — Very strict matching</option>
-    <option value="standard" {% if profile.match_mode == "standard" %}selected{% endif %}>Standard — Balanced</option>
-    <option value="adventurous" {% if profile.match_mode == "adventurous" %}selected{% endif %}>Adventurous — Broad, creative matching</option>
-
-  </select>
-</section>
-
+      <select name="match_mode"
+              class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-600">
+        <option value="safe" {% if profile.match_mode == "safe" %}selected{% endif %}>Safe (very strict)</option>
+        <option value="standard" {% if profile.match_mode == "standard" %}selected{% endif %}>Standard</option>
+        <option value="adventurous" {% if profile.match_mode == "adventurous" %}selected{% endif %}>Adventurous (broad)</option>
+      </select>
+    </section>
 
     <!-- JOB TITLES -->
     <section>
-      <h2 class="text-xl font-semibold mb-2">Job title preferences</h2>
-      <p class="text-gray-500 text-sm mb-4">
-        Add the roles you want HiredNow AI to target first.
-      </p>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Job titles</h2>
+      <p class="text-gray-600 text-sm mb-4">Add the roles you want HiredNow AI to prioritise.</p>
 
-      <label class="block">
-        <span class="text-gray-700">Target job titles</span>
-        <input
-          type="text"
-          name="job_titles"
-          value="{{ profile.job_titles or '' }}"
-          placeholder="Software Engineer, Marketing Manager"
-          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
-        />
-        <span class="text-xs text-gray-500">
-          Separate multiple titles with commas.
-        </span>
-      </label>
+      <input type="text"
+             name="job_titles"
+             value="{{ profile.job_titles or '' }}"
+             class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-600"
+             placeholder="Software Engineer, Product Manager">
+
+      <p class="text-xs text-gray-500 mt-1">Separate multiple titles with commas.</p>
     </section>
 
-    <!-- LOCATION -->
+    <!-- CITY & STATE UPDATE -->
     <section>
-      <h2 class="text-xl font-semibold mb-2">Location preferences</h2>
-      <p class="text-gray-500 text-sm mb-4">
-        These are used together with your latitude and longitude to match nearby roles.
-      </p>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Your location</h2>
+      <p class="text-gray-600 text-sm mb-4">These details help us calculate distance and find local roles.</p>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <label class="block">
-          <span class="text-gray-700">City</span>
-          <input
-            type="text"
-            name="city"
-            value="{{ profile.city or '' }}"
-            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
-          />
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- CITY -->
+        <div>
+          <label class="block text-gray-700 font-medium mb-1">City</label>
+          <input type="text"
+                 name="city"
+                 value="{{ profile.city or '' }}"
+                 placeholder="London"
+                 class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-600">
+        </div>
+
+        <!-- STATE -->
+        <div>
+          <label class="block text-gray-700 font-medium mb-1">State / Region</label>
+          <input type="text"
+                 name="state"
+                 value="{{ profile.state or '' }}"
+                 placeholder="Greater London"
+                 class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-600">
+        </div>
+
+      </div>
+    </section>
+
+    <!-- LOCATION MODE (LOCAL vs NATIONWIDE) -->
+    <section>
+      <h2 class="text-xl font-semibold text-gray-900 mb-3">On-site role search area</h2>
+
+      <div class="space-y-4">
+
+        <!-- LOCAL -->
+        <label class="block cursor-pointer">
+          <input type="radio"
+                 name="location_scope"
+                 value="local"
+                 class="peer hidden"
+                 {% if profile.location_scope == 'local' %}checked{% endif %}>
+
+          <div class="border border-gray-300 rounded-2xl p-5 bg-white shadow-sm transition
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:ring-2 peer-checked:ring-orange-200">
+
+            <h3 class="text-lg font-semibold text-gray-900">Local search radius</h3>
+            <p class="text-gray-600 text-sm">Limit search to nearby roles.</p>
+          </div>
         </label>
 
-        <label class="block">
-          <span class="text-gray-700">State or region</span>
-          <input
-            type="text"
-            name="state"
-            value="{{ profile.state or '' }}"
-            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
-          />
+        <!-- NATIONWIDE -->
+        <label class="block cursor-pointer">
+          <input type="radio"
+                 name="location_scope"
+                 value="nationwide"
+                 class="peer hidden"
+                 {% if profile.location_scope != 'local' %}checked{% endif %}>
+
+          <div class="border border-gray-300 rounded-2xl p-5 bg-white shadow-sm transition
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:ring-2 peer-checked:ring-orange-200">
+
+            <h3 class="text-lg font-semibold text-gray-900">Nationwide</h3>
+            <p class="text-gray-600 text-sm">Search anywhere in your country.</p>
+          </div>
         </label>
 
-        <label class="block">
-          <span class="text-gray-700">Country</span>
-          <select
-            name="country"
-            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
-          >
-            <option value="">Select country</option>
-            <option value="United Kingdom" {% if profile.country == "United Kingdom" %}selected{% endif %}>United Kingdom</option>
-            <option value="United States" {% if profile.country == "United States" %}selected{% endif %}>United States</option>
-            <option value="Canada" {% if profile.country == "Canada" %}selected{% endif %}>Canada</option>
-            <option value="Australia" {% if profile.country == "Australia" %}selected{% endif %}>Australia</option>
-          </select>
-        </label>
       </div>
 
-      <div class="mt-4">
-        <label class="inline-flex items-center">
-          <input
-            type="checkbox"
-            name="remote_preference"
-            {% if profile.remote_preference %}checked{% endif %}
-            class="h-5 w-5 text-blue-600 rounded"
-          />
-          <span class="ml-2 text-gray-700">I am happy with fully remote roles</span>
+      <!-- LOCAL DISTANCE SLIDER -->
+      <div id="radiusContainer" class="mt-4 {% if profile.location_scope != 'local' %}hidden{% endif %}">
+        <h3 class="font-semibold text-gray-900 mb-2">Distance</h3>
+
+        <input type="range"
+               name="miles_distance"
+               min="20" max="300"
+               value="{{ profile.miles_distance or 20 }}"
+               id="radiusSlider"
+               class="w-full accent-orange-500">
+
+        <p class="text-gray-800 mt-1">
+          <span id="radiusValue">{{ profile.miles_distance or 20 }}</span> miles
+        </p>
+      </div>
+    </section>
+
+    <!-- REMOTE PREFS -->
+    <section>
+      <h2 class="text-xl font-semibold text-gray-900 mb-3">Remote preferences</h2>
+
+      <div class="space-y-4">
+
+        <!-- No Remote -->
+        <label class="block cursor-pointer">
+          <input type="radio"
+                 name="remote_mode"
+                 value="none"
+                 class="peer hidden"
+                 {% if not profile.remote_preference %}checked{% endif %}>
+
+          <div class="border border-gray-300 rounded-2xl p-5 bg-white shadow-sm transition
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:ring-2 peer-checked:ring-orange-200">
+            <h3 class="text-lg font-semibold">No remote roles</h3>
+            <p class="text-gray-600 text-sm">Only on-site or hybrid jobs.</p>
+          </div>
         </label>
+
+        <!-- Remote Nationwide -->
+        <label class="block cursor-pointer">
+          <input type="radio"
+                 name="remote_mode"
+                 value="nationwide"
+                 class="peer hidden"
+                 {% if profile.remote_preference and not profile.worldwide_remote %}checked{% endif %}>
+
+          <div class="border border-gray-300 rounded-2xl p-5 bg-white shadow-sm transition
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:ring-2 peer-checked:ring-orange-200">
+            <h3 class="text-lg font-semibold">Remote (nationwide)</h3>
+            <p class="text-gray-600 text-sm">Remote jobs anywhere in your country.</p>
+          </div>
+        </label>
+
+        <!-- Remote Worldwide -->
+        <label class="block cursor-pointer">
+          <input type="radio"
+                 name="remote_mode"
+                 value="worldwide"
+                 class="peer hidden"
+                 {% if profile.worldwide_remote %}checked{% endif %}>
+
+          <div class="border border-gray-300 rounded-2xl p-5 bg-white shadow-sm transition
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:ring-2 peer-checked:ring-orange-200">
+            <h3 class="text-lg font-semibold">Remote (worldwide)</h3>
+            <p class="text-gray-600 text-sm">Work-from-anywhere roles globally.</p>
+          </div>
+        </label>
+
       </div>
     </section>
 
     <!-- SALARY -->
     <section>
-      <h2 class="text-xl font-semibold mb-2">Salary range</h2>
-      <p class="text-gray-500 text-sm mb-4">
-        We will prioritise roles that fall inside this range where possible.
-      </p>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Salary range</h2>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <label class="block">
-          <span class="text-gray-700">Minimum salary</span>
-          <input
-            type="number"
-            name="min_salary"
-            value="{{ profile.min_salary or '' }}"
-            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
-          />
-        </label>
 
-        <label class="block">
-          <span class="text-gray-700">Maximum salary</span>
-          <input
-            type="number"
-            name="max_salary"
-            value="{{ profile.max_salary or '' }}"
-            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
-          />
-        </label>
+        <div>
+          <label class="block text-gray-700">Minimum salary</label>
+          <input type="number"
+                 name="min_salary"
+                 value="{{ profile.min_salary or '' }}"
+                 class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-600">
+        </div>
+
+        <div>
+          <label class="block text-gray-700">Maximum salary</label>
+          <input type="number"
+                 name="max_salary"
+                 value="{{ profile.max_salary or '' }}"
+                 class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-600">
+        </div>
+
       </div>
     </section>
 
-    <!-- APPLICATION FREQUENCY -->
-    <section>
-      <h2 class="text-xl font-semibold mb-2">Application frequency</h2>
-      <p class="text-gray-500 text-sm mb-4">
-        Control how often HiredNow AI applies on your behalf.
-      </p>
-
-      <label class="block">
-        <select
-          name="application_frequency"
-          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
-        >
-          <option value="hourly" {% if profile.application_frequency == "hourly" %}selected{% endif %}>Apply throughout the day</option>
-          <option value="daily" {% if profile.application_frequency == "daily" %}selected{% endif %}>Apply once per day</option>
-          <option value="twice_daily" {% if profile.application_frequency == "twice_daily" %}selected{% endif %}>Apply twice per day</option>
-          <option value="weekly" {% if profile.application_frequency == "weekly" %}selected{% endif %}>Apply a few times per week</option>
-        </select>
-      </label>
-    </section>
-
-<!-- CV SECTION -->
-<section>
-  <h2 class="text-xl font-semibold mb-2">Your CV</h2>
-  <p class="text-gray-500 text-sm mb-4">
-    This is the structured CV profile HiredNow AI uses when tailoring applications for each role.
-  </p>
-
-  <div class="border rounded-lg p-4 bg-gray-50 flex items-center justify-between">
-
-    <div>
-      {% if profile.ai_cv_data %}
-        <p class="text-gray-700 text-sm">
-          Your CV has been analysed and is ready to personalise for each job.
-        </p>
-      {% else %}
-        <p class="text-gray-700 text-sm">
-          You haven't uploaded a CV yet — complete the CV setup to improve your applications.
-        </p>
-      {% endif %}
-    </div>
-
-    <a href="{{ url_for('onboarding.cv_preview') }}"
-       class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow transition">
-      View CV Details
-    </a>
-
-  </div>
-</section>
-
-
     <!-- SAVE BUTTON -->
-    <div>
-      <button
-        class="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
-      >
-        Save preferences
-      </button>
-    </div>
+    <button class="w-full bg-blue-600 text-white py-4 rounded-full text-lg font-semibold hover:bg-blue-700 transition shadow-md">
+      Save preferences
+    </button>
 
   </form>
 </div>
+
+<!-- SLIDER SCRIPT -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const slider = document.getElementById("radiusSlider");
+  const value = document.getElementById("radiusValue");
+  const radioLocal = document.querySelector("input[value='local']");
+  const radioNation = document.querySelector("input[value='nationwide']");
+  const container = document.getElementById("radiusContainer");
+
+  function toggleRadius() {
+    if (radioLocal.checked) container.classList.remove("hidden");
+    else container.classList.add("hidden");
+  }
+
+  slider?.addEventListener("input", () => value.textContent = slider.value);
+  radioLocal?.addEventListener("change", toggleRadius);
+  radioNation?.addEventListener("change", toggleRadius);
+
+  toggleRadius();
+});
+</script>
+
 {% endblock %}

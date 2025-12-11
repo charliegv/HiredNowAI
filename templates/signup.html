@@ -1,29 +1,65 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="min-h-screen flex items-center justify-center px-4 bg-gray-50">
 
-  <div class="w-full max-w-md bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+<div class="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10">
+
+  <div class="w-full max-w-lg bg-white p-10 rounded-2xl shadow-md border border-gray-100">
 
     <!-- Header -->
-    <div class="text-center mb-8">
-      <h1 class="text-3xl font-semibold text-gray-900">Create your account</h1>
+    <div class="text-center mb-10">
+      <h1 class="text-3xl font-bold text-gray-900">
+        Create your HiredNow account
+      </h1>
+
       <p class="text-gray-600 text-sm mt-2">
-        Join HiredNow AI and start automating your job search.
+        AI-powered job applications. Apply while you sleep.
       </p>
     </div>
 
-    <!-- Flash messages -->
+    <!-- Benefits / Selling Section -->
+    <div class="grid gap-4 mb-10">
+
+      <div class="flex gap-3 items-start">
+        <div class="bg-blue-100 text-blue-700 w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold">
+          ✓
+        </div>
+        <p class="text-gray-700 text-sm leading-relaxed">
+          Auto-apply to relevant jobs every day — without manual effort.
+        </p>
+      </div>
+
+      <div class="flex gap-3 items-start">
+        <div class="bg-blue-100 text-blue-700 w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold">
+          ✓
+        </div>
+        <p class="text-gray-700 text-sm leading-relaxed">
+          Smart matching that finds roles you're truly suited for.
+        </p>
+      </div>
+
+      <div class="flex gap-3 items-start">
+        <div class="bg-blue-100 text-blue-700 w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold">
+          ✓
+        </div>
+        <p class="text-gray-700 text-sm leading-relaxed">
+          Customised CV variants for every application to increase replies.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
-          <div class="mb-4 p-3 rounded-md
+          <div
+            class="mb-6 px-4 py-3 rounded-xl text-sm font-medium
             {% if category == 'error' %}
               bg-red-100 text-red-700
             {% else %}
               bg-green-100 text-green-700
-            {% endif %}
-          ">
+            {% endif %}">
             {{ message }}
           </div>
         {% endfor %}
@@ -31,59 +67,62 @@
     {% endwith %}
 
     <!-- Signup Form -->
-    <form method="POST">
+    <form method="POST" class="space-y-6">
 
-      <label class="block mb-4">
-        <span class="text-gray-700">Email address</span>
+      <!-- Email -->
+      <div>
+        <label class="block text-gray-700 font-medium mb-1">Email address</label>
         <input
           type="email"
           name="email"
           required
-          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
+          class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white shadow-sm
+                 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
         />
-      </label>
+      </div>
 
-      <label class="block mb-6">
-        <span class="text-gray-700">Password</span>
+      <!-- Password -->
+      <div>
+        <label class="block text-gray-700 font-medium mb-1">Password</label>
         <input
           type="password"
           name="password"
           required
-          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-600 focus:border-blue-600"
+          class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white shadow-sm
+                 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
         />
-      </label>
+      </div>
 
-      <!-- Submit -->
+      <!-- CTA -->
       <button
-        class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-semibold"
-      >
+        class="w-full bg-blue-600 text-white py-4 rounded-full text-lg font-semibold
+               hover:bg-blue-700 transition shadow-md">
         Create Account
       </button>
 
     </form>
 
-    <!-- Divider -->
-    <div class="my-6 border-t border-gray-200"></div>
-
     <!-- Early Access Promo Block -->
-    <div class="bg-blue-50 py-4 px-5 rounded-lg border border-blue-100">
+    <div class="mt-10 bg-blue-50 py-5 px-5 rounded-xl border border-blue-100">
       <p class="text-sm font-semibold text-blue-700">
-        Now open for Early Access
+        You're joining Early Access 🚀
       </p>
-      <p class="text-gray-600 text-xs mt-1 leading-relaxed">
-        Get into the private beta and let HiredNow AI apply for jobs while you sleep.
-        Be one of the first people in the world using automated job applications.
+      <p class="text-gray-700 text-xs mt-1 leading-relaxed">
+        Thousands of job seekers already use HiredNow AI to automate their search.
+        You’ll be among the first to access powerful CV tailoring and automated
+        applications across hundreds of job boards.
       </p>
     </div>
 
     <!-- Login Link -->
     <p class="text-center text-sm text-gray-600 mt-6">
       Already have an account?
-      <a href="{{ url_for('auth.login') }}" class="text-blue-600 hover:underline">
+      <a href="{{ url_for('auth.login') }}" class="text-blue-600 font-semibold hover:underline">
         Log in
       </a>
     </p>
 
   </div>
 </div>
+
 {% endblock %}

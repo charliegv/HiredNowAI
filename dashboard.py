@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash, send_file, redirect
+from flask import Blueprint, render_template, redirect, url_for, request, flash, send_file, redirect, jsonify
 from flask_login import login_required, current_user
 from models import db, Profile, PendingApplication, Application, Match, Job
 from datetime import datetime
@@ -344,3 +344,34 @@ def apply_from_match(match_id):
 
     flash("AI is now preparing your application…", "success")
     return redirect(url_for("dashboard.dashboard_home"))
+
+@dashboard.route("/dashboard/metrics")
+@login_required
+def dashboard_metrics():
+    from datetime import datetime, timedelta
+    from sqlalchemy import func
+
+    sixty_days_ago = datetime.utcnow() - timedelta(days=60)
+
+    rows = (
+        db.session.query(
+            func.date(Application.created_at),
+            func.count().label("count")
+        )
+        .filter(
+            Application.user_id == current_user.id,
+            Application.status.in_(["success", "manual_success"]),
+            Application.created_at >= sixty_days_ago,
+        )
+        .group_by(func.date(Application.created_at))
+        .order_by(func.date(Application.created_at))
+        .all()
+    )
+
+    labels = [row[0].strftime("%d %b") for row in rows]
+    values = [row[1] for row in rows]
+    print(labels)
+    print(values)
+    print("<<<<<< values")
+
+    return jsonify({"labels": labels, "values": values})
