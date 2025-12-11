@@ -370,8 +370,5 @@ def dashboard_metrics():
 
     labels = [row[0].strftime("%d %b") for row in rows]
     values = [row[1] for row in rows]
-    print(labels)
-    print(values)
-    print("<<<<<< values")
 
     return jsonify({"labels": labels, "values": values})
