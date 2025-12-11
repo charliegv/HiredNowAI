@@ -2,131 +2,147 @@
 
 {% block content %}
 
-<div class="max-w-xl mx-auto bg-white p-8 rounded-xl shadow">
+<div class="max-w-3xl mx-auto bg-white p-10 rounded-2xl shadow-md">
 
   {% include "components/progress.html" with context %}
 
-  <h1 class="text-2xl font-bold mb-4">Choose how often we apply for you</h1>
+  <h1 class="text-3xl font-bold mb-8 text-gray-900 text-center">
+    Choose how HiredNow applies for you
+  </h1>
 
-  <form method="POST" enctype="multipart/form-data" class="space-y-6">
+  <form method="POST" enctype="multipart/form-data" class="space-y-10">
 
-    <!-- Application frequency -->
+    <!-- APPLICATION MODE SECTION -->
     <div>
-      <label class="block text-gray-700 font-medium mb-2">
-        Application frequency
-      </label>
+      <h2 class="text-xl font-semibold mb-4 text-gray-900">Application method</h2>
+      <p class="text-gray-600 mb-4 text-sm">Pick how you want HiredNow AI to submit applications for you.</p>
 
-      <select name="application_frequency"
-        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500">
-        <option value="daily">Daily</option>
-<!--        <option value="twice_daily">Twice daily</option>-->
-<!--        <option value="hourly">Hourly</option>-->
-      </select>
+      <div class="space-y-4">
+
+        <!-- AUTO APPLY -->
+        <label class="block cursor-pointer">
+
+          <input type="radio" name="application_mode" value="auto" class="peer hidden" checked>
+
+          <div class="border border-gray-300 rounded-2xl p-6 shadow-sm bg-white transition
+                      hover:shadow-md hover:border-gray-400
+                      peer-checked:border-orange-500 peer-checked:ring-2 peer-checked:ring-orange-200
+                      peer-checked:bg-orange-50">
+
+            <h3 class="text-lg font-semibold text-gray-900">Auto-apply (recommended)</h3>
+            <p class="text-gray-500 text-sm mt-1">
+              We apply automatically to suitable jobs on your behalf.
+            </p>
+
+          </div>
+        </label>
+
+        <!-- APPROVAL REQUIRED -->
+        <label class="block cursor-pointer">
+
+          <input type="radio" name="application_mode" value="approval" class="peer hidden">
+
+          <div class="border border-gray-300 rounded-2xl p-6 shadow-sm bg-white transition
+                      hover:shadow-md hover:border-gray-400
+                      peer-checked:border-orange-500 peer-checked:ring-2 peer-checked:ring-orange-200
+                      peer-checked:bg-orange-50">
+
+            <h3 class="text-lg font-semibold text-gray-900">Approval required</h3>
+            <p class="text-gray-500 text-sm mt-1">
+              You review and approve each application before it is sent.
+            </p>
+
+          </div>
+        </label>
+
+      </div>
     </div>
 
-      <!-- Application Mode -->
-<div>
-  <label class="block text-gray-700 font-medium mb-2">
-    How should HiredNow AI apply for you?
-  </label>
+    <!-- APPLICATION FREQUENCY -->
+    <div>
+      <h2 class="text-xl font-semibold mb-4 text-gray-900">How often should we apply?</h2>
 
-  <select name="application_mode"
-          class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500">
+      <select name="application_frequency"
+              class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                     focus:ring focus:ring-blue-500 text-gray-800">
+        <option value="daily">Daily applications</option>
+      </select>
 
-    <option value="auto">Auto-apply (recommended) — We apply automatically on your behalf.</option>
-    <option value="approval">Approval required — You must approve each application first.</option>
+      <p class="text-gray-500 text-sm mt-2">We apply steadily throughout the day to maximise reach.</p>
+    </div>
 
-  </select>
-</div>
+    <!-- MATCHING STRICTNESS -->
+    <div>
+      <h2 class="text-xl font-semibold mb-4 text-gray-900">Matching strictness</h2>
 
-<!-- Matching Strictness -->
-<div>
-  <label class="block text-gray-700 font-medium mb-2">
-    How closely should we match jobs to your CV?
-  </label>
+      <label class="block cursor-pointer">
 
-  <select name="match_mode"
-          class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500">
+        <input type="radio" name="match_mode" value="standard" class="peer hidden" checked>
 
-<!--    <option value="safe">Safe mode — Only very close matches to your profile.</option>-->
-    <option value="standard" selected>Standard mode — Balanced matching.</option>
-<!--    <option value="adventurous">Adventurous mode — Broader, creative role matching.</option>-->
+        <div class="border border-gray-300 rounded-xl p-5 bg-white shadow-sm transition
+                    hover:shadow-md hover:border-gray-400
+                    peer-checked:border-orange-500 peer-checked:ring-2 peer-checked:ring-orange-200
+                    peer-checked:bg-orange-50">
 
-  </select>
-</div>
+          <span class="font-semibold text-gray-900">Standard matching</span>
+          <p class="text-gray-500 text-sm mt-1">
+            Balanced approach — relevant and personalised matches.
+          </p>
 
+        </div>
+      </label>
+    </div>
 
-<!-- CV Upload -->
-<div>
-  <label class="block text-gray-700 font-medium mb-2">
-    Upload your CV or Resume
-  </label>
+    <!-- CV UPLOAD -->
+    <div>
+      <h2 class="text-xl font-semibold mb-4 text-gray-900">Upload your CV or resume</h2>
 
-  <!-- Strong file format warning -->
-  <p class="text-red-600 text-sm font-semibold mb-2">
-    Only .docx, .pdf, or .txt files are accepted.
-  </p>
+      <div class="p-6 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
 
-  <input
-    type="file"
-    name="cv_file"
-    accept=".pdf,.docx,.txt"
-    class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-white text-gray-700"
-    required
-  />
+        <p class="text-red-600 text-sm font-semibold mb-2">Accepted formats: .docx, .pdf, .txt</p>
 
-  <p class="text-xs text-gray-500 mt-1">
-    Accepted formats: Microsoft Word (.docx), PDF, or plain text (.txt)
-  </p>
+        <input type="file" name="cv_file" accept=".pdf,.docx,.txt"
+               class="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white text-gray-800"
+               required>
 
-  {% if profile and profile.cv_location %}
-    <p class="text-xs text-gray-500 mt-1">
-      Current CV: {{ profile.cv_location }}
-    </p>
-  {% endif %}
-</div>
+        {% if profile and profile.cv_location %}
+        <p class="text-xs text-gray-500 mt-2">Current CV: {{ profile.cv_location }}</p>
+        {% endif %}
+      </div>
+    </div>
 
-
+    <!-- CTA BUTTON -->
     <button
-      class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition">
-      Finish and go to your dashboard
+      class="w-full bg-blue-600 text-white py-4 rounded-full text-lg font-semibold
+             hover:bg-blue-700 transition shadow-md">
+      Finish and go to next step
     </button>
 
   </form>
-
 </div>
 
-
+<!-- CV ANALYSIS MODAL -->
 <div id="cvLoadingModal"
-     class="hidden fixed top-0 left-0 w-screen h-screen flex items-center justify-center bg-black bg-opacity-40 z-[9999]">
+     class="hidden fixed top-0 left-0 w-screen h-screen flex items-center justify-center
+            bg-black bg-opacity-40 z-[9999]">
+
   <div class="bg-white p-8 rounded-xl shadow-xl w-80 text-center">
 
-    <img
-      src="{{ url_for('static', filename='images/cv_anlyse_animation.gif') }}"
-      alt="Analyzing CV animation"
-      class="w-20 h-20 mx-auto mb-4"
-    />
+    <img src="{{ url_for('static', filename='images/cv_anlyse_animation.gif') }}"
+         alt="Analyzing CV animation"
+         class="w-20 h-20 mx-auto mb-4">
 
-    <h2 class="text-xl font-semibold text-gray-900 mb-2">
-      Analyzing your CV/Resume
-    </h2>
+    <h2 class="text-xl font-semibold text-gray-900 mb-2">Analyzing your CV/Resume</h2>
+    <p class="text-gray-600 text-sm">This usually takes a few seconds…</p>
 
-    <p class="text-gray-600 text-sm">
-      This usually takes a few seconds…
-    </p>
   </div>
 </div>
-
-
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.querySelector("form");
   const modal = document.getElementById("cvLoadingModal");
-
-  form.addEventListener("submit", () => {
-    modal.classList.remove("hidden");
-  });
+  form.addEventListener("submit", () => modal.classList.remove("hidden"));
 });
 </script>
 

@@ -16,6 +16,20 @@ onboarding = Blueprint("onboarding", __name__)
 UPLOAD_FOLDER = "tmp/"
 
 
+def require_onboarding_complete(view):
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for("auth.login"))
+
+        # If profile exists but onboarding is not done
+        if not current_user.profile.onboarding_complete:
+            return redirect(url_for("onboarding.step1"))
+
+        return view(*args, **kwargs)
+    wrapper.__name__ = view.__name__
+    return wrapper
+
+
 # =========================================================
 # STEP 1 — Ensure a Profile always exists
 # =========================================================
@@ -57,53 +71,70 @@ def step1():
 
 
 
-# STEP 2 — Salary + Remote Preference
-# =========================================================
 @onboarding.route("/onboarding/step2", methods=["GET", "POST"])
 @login_required
 def step2():
     profile = get_or_create_profile()
 
-    # Prevent skipping step 1 (must be *before* POST logic returns)
+    # Prevent skipping step 1
     if not profile.job_titles or not profile.city:
         return redirect(url_for("onboarding.step1"))
 
     if request.method == "POST":
-        profile.min_salary = request.form["min_salary"]
-        profile.remote_preference = "remote_preference" in request.form
+        # -----------------------------
+        # SALARY
+        # -----------------------------
+        profile.min_salary = request.form.get("min_salary", type=int)
 
-        # Optional miles filter
-        if "miles_distance" in request.form:
-            try:
-                profile.miles_distance = int(request.form["miles_distance"])
-            except:
-                profile.miles_distance = None
+        # -----------------------------
+        # LOCATION SCOPE (local or nationwide)
+        # -----------------------------
+        location_scope = request.form.get("location_scope")
+        print(location_scope)
+
+        if location_scope == "local":
+            profile.location_scope = "local"
+            slider_value = request.form.get("local_radius")
+            print("SLIDER VALUE:", slider_value)
+            profile.miles_distance = request.form.get("local_radius", type=int)
+        else:
+            profile.location_scope = "nationwide"
+            profile.miles_distance = 5000  # irrelevant
+
+        # -----------------------------
+        # REMOTE OPTIONS (boolean pair)
+        # -----------------------------
+        remote_choice = request.form.get("remote_preference")
+
+        if remote_choice == "no_remote":
+            profile.remote_preference = False
+            profile.worldwide_remote = False
+
+        elif remote_choice == "remote_national":
+            profile.remote_preference = True
+            profile.worldwide_remote = False
+
+        elif remote_choice == "remote_worldwide":
+            profile.remote_preference = True
+            profile.worldwide_remote = True
 
         db.session.commit()
 
-        # -----------------------------------------------------
-        # FIRE ASYNC MATCHING IMMEDIATELY (non blocking)
-        # -----------------------------------------------------
+        # -----------------------------
+        # ASYNC MATCH QUEUE
+        # -----------------------------
         try:
-            user_id = current_user.id  # capture before thread
-
-            # Insert user_id into match queue
-            from psycopg2.extras import RealDictCursor
-
+            user_id = current_user.id
             conn = psycopg2.connect(os.getenv("DATABASE_URL"))
-            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur = conn.cursor()
             cur.execute("INSERT INTO match_queue (user_id) VALUES (%s)", (user_id,))
             conn.commit()
             cur.close()
             conn.close()
 
-            print(f"[MATCH] Queued matching job for user {user_id}")
-
-
         except Exception as e:
             print("Error Queuing matching thread:", e)
 
-        # Redirect instantly, do not wait for matching
         return redirect(url_for("onboarding.step3"))
 
     # GET request

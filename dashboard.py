@@ -6,6 +6,7 @@ from sqlalchemy import desc
 import hashlib
 import requests
 from io import BytesIO
+from onboarding import require_onboarding_complete
 
 
 dashboard = Blueprint('dashboard', __name__)
@@ -13,6 +14,7 @@ dashboard = Blueprint('dashboard', __name__)
 
 @dashboard.route("/")
 @login_required
+@require_onboarding_complete
 def dashboard_home():
 
     profile = current_user.profile

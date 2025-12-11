@@ -62,10 +62,14 @@ class Profile(db.Model):
     country = db.Column(db.String(100))        # e.g. “UK”, “United States”, “Canada”
 
     remote_preference = db.Column(db.Boolean, default=False)
+    worldwide_remote = db.Column(db.Boolean, default=False)
+
+    location_scope = db.Column(db.String(50), default="nationwide")
 
     # Salary preferences
     min_salary = db.Column(db.Integer)
     max_salary = db.Column(db.Integer)
+    miles_distance = db.Column(db.Integer)
 
     # Application automation
     application_frequency = db.Column(db.String(50), default="daily")

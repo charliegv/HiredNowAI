@@ -1,87 +1,112 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<div class="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow">
+<div class="max-w-4xl mx-auto bg-white p-10 rounded-2xl shadow-md">
 
-  <h1 class="text-2xl font-bold mb-6">Edit Your CV Profile</h1>
+  <!-- HEADER -->
+  <h1 class="text-3xl font-bold mb-4 text-gray-900 text-center">
+    Review and Complete Your CV Profile
+  </h1>
 
-  <form method="POST" id="cvForm" class="space-y-10">
-      <!-- Personal Details -->
-<div>
-  <h2 class="text-xl font-semibold mb-3">Personal Details</h2>
+  <p class="text-gray-600 text-center max-w-2xl mx-auto mb-8">
+    This information is used to auto-complete job applications for you.
+    Please take a moment to <span class="font-semibold text-gray-800">review and update your details</span>
+    before continuing.
+  </p>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-    <label class="block">
-      <span class="text-gray-700">First Name</span>
-      <input type="text" name="first_name"
-             value="{{ cv.first_name or '' }}"
-             class="mt-1 w-full border rounded-lg p-3" required />
-    </label>
-
-    <label class="block">
-      <span class="text-gray-700">Last Name</span>
-      <input type="text" name="last_name"
-             value="{{ cv.last_name or '' }}"
-             class="mt-1 w-full border rounded-lg p-3" required />
-    </label>
-
-    <label class="block">
-      <span class="text-gray-700">Email</span>
-      <input type="email" name="email"
-             value="{{ cv.email or '' }}"
-             class="mt-1 w-full border rounded-lg p-3" required />
-    </label>
-
-    <label class="block">
-      <span class="text-gray-700">Phone</span>
-      <input type="text" name="phone"
-             value="{{ cv.phone or '' }}"
-             pattern="^\+\d{6,15}$"
-             title="Phone number must start with + and include your country code, for example +447912345678"
-             class="mt-1 w-full border rounded-lg p-3" required />
-    </label>
-
+  <!-- INFO ALERT -->
+  <div class="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-xl mb-10 text-sm shadow-sm">
+    <strong class="font-semibold">Tip:</strong>
+    Accuracy helps your applications succeed. Double-check everything below and make edits where needed.
   </div>
 
-  <label class="block mt-4">
-    <span class="text-gray-700">Full Address</span>
-    <input type="text" name="address"
-           value="{{ cv.address or '' }}"
-           class="mt-1 w-full border rounded-lg p-3" />
-  </label>
-</div>
+  <form method="POST" id="cvForm" class="space-y-12">
 
-
-    <!-- Summary -->
+    <!-- ========================= -->
+    <!-- PERSONAL DETAILS SECTION -->
+    <!-- ========================= -->
     <div>
-      <label class="block text-gray-700 font-semibold mb-1">Professional Summary</label>
+      <h2 class="text-xl font-semibold mb-4 text-gray-900">Personal Details</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <label class="block">
+          <span class="text-gray-700 font-medium">First Name</span>
+          <input type="text" name="first_name"
+                 value="{{ cv.first_name or '' }}"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm focus:ring-2 focus:ring-blue-500"
+                 required />
+        </label>
+
+        <label class="block">
+          <span class="text-gray-700 font-medium">Last Name</span>
+          <input type="text" name="last_name"
+                 value="{{ cv.last_name or '' }}"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm focus:ring-2 focus:ring-blue-500"
+                 required />
+        </label>
+
+        <label class="block">
+          <span class="text-gray-700 font-medium">Email</span>
+          <input type="email" name="email"
+                 value="{{ cv.email or '' }}"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm focus:ring-2 focus:ring-blue-500"
+                 required />
+        </label>
+
+        <label class="block">
+          <span class="text-gray-700 font-medium">Phone</span>
+          <input type="text" name="phone"
+                 value="{{ cv.phone or '' }}"
+                 pattern="^\+\d{6,15}$"
+                 title="Must start with + and include your country code, for example +447912345678"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm focus:ring-2 focus:ring-blue-500"
+                 required />
+        </label>
+
+      </div>
+
+      <label class="block mt-5">
+        <span class="text-gray-700 font-medium">Full Address</span>
+        <input type="text" name="address"
+               value="{{ cv.address or '' }}"
+               class="mt-1 w-full border rounded-xl p-3 shadow-sm focus:ring-2 focus:ring-blue-500" />
+      </label>
+    </div>
+
+    <!-- SUMMARY -->
+    <div>
+      <h2 class="text-xl font-semibold mb-3 text-gray-900">Professional Summary</h2>
       <textarea name="summary"
-                class="w-full border rounded-lg p-3"
+                class="w-full border rounded-xl p-3 shadow-sm focus:ring-2 focus:ring-blue-500"
                 rows="4">{{ cv.summary }}</textarea>
     </div>
 
-    <!-- Skills -->
+    <!-- SKILLS -->
     <div>
-      <label class="block text-gray-700 font-semibold mb-1">Skills (comma separated)</label>
+      <h2 class="text-xl font-semibold mb-3 text-gray-900">Skills</h2>
       <input type="text"
              name="skills"
              value="{{ cv.skills | join(', ') }}"
-             class="w-full border rounded-lg p-3" />
+             placeholder="e.g. Python, SQL, Project Management"
+             class="w-full border rounded-xl p-3 shadow-sm focus:ring-2 focus:ring-blue-500" />
     </div>
 
-    <!-- Job titles -->
+    <!-- JOB TITLES -->
     <div>
-      <label class="block text-gray-700 font-semibold mb-1">Job Titles (comma separated)</label>
+      <h2 class="text-xl font-semibold mb-3 text-gray-900">Job Titles</h2>
       <input type="text"
              name="job_titles"
              value="{{ cv.job_titles | join(', ') }}"
-             class="w-full border rounded-lg p-3" />
+             placeholder="e.g. Software Engineer, Data Analyst"
+             class="w-full border rounded-xl p-3 shadow-sm focus:ring-2 focus:ring-blue-500" />
     </div>
 
-    <!-- Experience -->
+    <!-- ========================= -->
+    <!-- EXPERIENCE SECTION -->
+    <!-- ========================= -->
     <div>
-      <label class="block text-gray-700 font-semibold mb-4">Experience</label>
+      <h2 class="text-xl font-semibold mb-4 text-gray-900">Experience</h2>
 
       {% set count = cv.experience | length %}
       <input type="hidden" id="exp_count" name="exp_count" value="{{ count }}">
@@ -89,40 +114,48 @@
       <div id="experience_container">
 
         {% for exp in cv.experience %}
-        <div class="experience-block p-4 border rounded-lg mb-4 bg-gray-50 relative">
+        <div class="experience-block p-5 border rounded-xl mb-5 bg-gray-50 shadow-sm relative">
 
-          <!-- Delete button -->
-          <label class="absolute top-2 right-3 text-red-500 text-sm cursor-pointer">
+          <label class="absolute top-3 right-4 text-red-600 text-sm cursor-pointer">
             <input type="checkbox" name="exp_delete_{{ loop.index0 }}" class="mr-1">
             Remove
           </label>
 
-          <label class="block text-sm text-gray-600 mb-1">Role</label>
-          <input type="text" name="exp_role_{{ loop.index0 }}" value="{{ exp.role }}" class="w-full border rounded-lg p-2 mb-3" />
+          <label class="block text-sm text-gray-700 mb-1">Role</label>
+          <input type="text" name="exp_role_{{ loop.index0 }}"
+                 value="{{ exp.role }}"
+                 class="w-full border rounded-lg p-2 mb-3" />
 
-          <label class="block text-sm text-gray-600 mb-1">Company</label>
-          <input type="text" name="exp_company_{{ loop.index0 }}" value="{{ exp.company }}" class="w-full border rounded-lg p-2 mb-3" />
+          <label class="block text-sm text-gray-700 mb-1">Company</label>
+          <input type="text" name="exp_company_{{ loop.index0 }}"
+                 value="{{ exp.company }}"
+                 class="w-full border rounded-lg p-2 mb-3" />
 
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm text-gray-600 mb-1">Start Date</label>
-              <input type="text" name="exp_start_{{ loop.index0 }}" value="{{ exp.start_date }}" class="w-full border rounded-lg p-2" />
+              <label class="block text-sm text-gray-700 mb-1">Start Date</label>
+              <input type="text" name="exp_start_{{ loop.index0 }}"
+                     value="{{ exp.start_date }}"
+                     class="w-full border rounded-lg p-2" />
             </div>
             <div>
-              <label class="block text-sm text-gray-600 mb-1">End Date</label>
-              <input type="text" name="exp_end_{{ loop.index0 }}" value="{{ exp.end_date }}" class="w-full border rounded-lg p-2" />
+              <label class="block text-sm text-gray-700 mb-1">End Date</label>
+              <input type="text" name="exp_end_{{ loop.index0 }}"
+                     value="{{ exp.end_date }}"
+                     class="w-full border rounded-lg p-2" />
             </div>
           </div>
 
-          <label class="block text-sm text-gray-600 mb-1 mt-3">Description</label>
-          <textarea name="exp_desc_{{ loop.index0 }}" class="w-full border rounded-lg p-2" rows="3">{{ exp.description }}</textarea>
-
+          <label class="block text-sm text-gray-700 mb-1 mt-3">Description</label>
+          <textarea name="exp_desc_{{ loop.index0 }}"
+                    class="w-full border rounded-lg p-2"
+                    rows="3">{{ exp.description }}</textarea>
         </div>
         {% endfor %}
 
       </div>
 
-      <!-- ADD NEW EXPERIENCE BUTTON -->
+      <!-- ADD EXPERIENCE BUTTON -->
       <button type="button"
               id="addExperienceBtn"
               class="mt-3 bg-blue-100 text-blue-700 text-sm py-2 px-4 rounded-lg hover:bg-blue-200 transition">
@@ -130,9 +163,12 @@
       </button>
     </div>
 
-    <!-- Education -->
+
+    <!-- ========================= -->
+    <!-- EDUCATION SECTION -->
+    <!-- ========================= -->
     <div>
-      <label class="block text-gray-700 font-semibold mb-4">Education</label>
+      <h2 class="text-xl font-semibold mb-4 text-gray-900">Education</h2>
 
       {% set edu_count = cv.education | length %}
       <input type="hidden" id="edu_count" name="edu_count" value="{{ edu_count }}">
@@ -140,29 +176,33 @@
       <div id="education_container">
 
         {% for edu in cv.education %}
-        <div class="education-block p-4 border rounded-lg mb-4 bg-gray-50 relative">
+        <div class="education-block p-5 border rounded-xl mb-5 bg-gray-50 shadow-sm relative">
 
-          <!-- Delete button -->
-          <label class="absolute top-2 right-3 text-red-500 text-sm cursor-pointer">
+          <label class="absolute top-3 right-4 text-red-600 text-sm cursor-pointer">
             <input type="checkbox" name="edu_delete_{{ loop.index0 }}" class="mr-1">
             Remove
           </label>
 
-          <label class="block text-sm text-gray-600 mb-1">Degree</label>
-          <input type="text" name="edu_degree_{{ loop.index0 }}" value="{{ edu.degree }}" class="w-full border rounded-lg p-2 mb-3" />
+          <label class="block text-sm text-gray-700 mb-1">Degree</label>
+          <input type="text" name="edu_degree_{{ loop.index0 }}"
+                 value="{{ edu.degree }}"
+                 class="w-full border rounded-lg p-2 mb-3" />
 
-          <label class="block text-sm text-gray-600 mb-1">Institution</label>
-          <input type="text" name="edu_institution_{{ loop.index0 }}" value="{{ edu.institution }}" class="w-full border rounded-lg p-2 mb-3" />
+          <label class="block text-sm text-gray-700 mb-1">Institution</label>
+          <input type="text" name="edu_institution_{{ loop.index0 }}"
+                 value="{{ edu.institution }}"
+                 class="w-full border rounded-lg p-2 mb-3" />
 
-          <label class="block text-sm text-gray-600 mb-1">Graduation Year</label>
-          <input type="text" name="edu_year_{{ loop.index0 }}" value="{{ edu.graduation_year }}" class="w-full border rounded-lg p-2" />
+          <label class="block text-sm text-gray-700 mb-1">Graduation Year</label>
+          <input type="text" name="edu_year_{{ loop.index0 }}"
+                 value="{{ edu.graduation_year }}"
+                 class="w-full border rounded-lg p-2" />
 
         </div>
         {% endfor %}
 
       </div>
 
-      <!-- ADD NEW EDUCATION BUTTON -->
       <button type="button"
               id="addEducationBtn"
               class="mt-3 bg-blue-100 text-blue-700 text-sm py-2 px-4 rounded-lg hover:bg-blue-200 transition">
@@ -170,163 +210,106 @@
       </button>
     </div>
 
-    <!-- Certifications -->
+
+    <!-- CERTIFICATIONS -->
     <div>
-      <label class="block text-gray-700 font-semibold mb-1">Certifications (comma separated)</label>
+      <h2 class="text-xl font-semibold mb-3 text-gray-900">Certifications</h2>
       <input type="text"
              name="certifications"
              value="{{ cv.certifications | join(', ') }}"
-             class="w-full border rounded-lg p-3" />
+             class="w-full border rounded-xl p-3 shadow-sm focus:ring-2 focus:ring-blue-500" />
     </div>
 
-    <!-- Languages -->
+    <!-- LANGUAGES -->
     <div>
-      <label class="block text-gray-700 font-semibold mb-1">Languages (comma separated)</label>
+      <h2 class="text-xl font-semibold mb-3 text-gray-900">Languages</h2>
       <input type="text"
              name="languages"
              value="{{ cv.languages | join(', ') }}"
-             class="w-full border rounded-lg p-3" />
+             class="w-full border rounded-xl p-3 shadow-sm focus:ring-2 focus:ring-blue-500" />
     </div>
 
-      <!-- Additional Details -->
-<div>
-  <h2 class="text-xl font-semibold mb-3">Additional Details</h2>
 
-  <div class="space-y-4">
+    <!-- ADDITIONAL DETAILS -->
+    <div>
+      <h2 class="text-xl font-semibold mb-4 text-gray-900">Additional Details</h2>
 
-    <label class="block">
-      <span class="text-gray-700">GitHub</span>
-      <input type="text" name="github" value="{{ cv.additional_details.github or '' }}"
-             class="mt-1 w-full border rounded-lg p-3" />
-    </label>
+      <div class="space-y-4">
 
-    <label class="block">
-      <span class="text-gray-700">LinkedIn</span>
-      <input type="text" name="linkedin" value="{{ cv.additional_details.linkedin or '' }}"
-             class="mt-1 w-full border rounded-lg p-3" />
-    </label>
+        <label class="block">
+          <span class="text-gray-700">GitHub</span>
+          <input type="text" name="github"
+                 value="{{ cv.additional_details.github or '' }}"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm" />
+        </label>
 
-    <label class="block">
-      <span class="text-gray-700">Portfolio / Website</span>
-      <input type="text" name="portfolio" value="{{ cv.additional_details.portfolio or '' }}"
-             class="mt-1 w-full border rounded-lg p-3" />
-    </label>
+        <label class="block">
+          <span class="text-gray-700">LinkedIn</span>
+          <input type="text" name="linkedin"
+                 value="{{ cv.additional_details.linkedin or '' }}"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm" />
+        </label>
 
-    <label class="block">
-      <span class="text-gray-700">Thesis / Dissertation</span>
-      <input type="text" name="thesis" value="{{ cv.additional_details.thesis or '' }}"
-             class="mt-1 w-full border rounded-lg p-3" />
-    </label>
+        <label class="block">
+          <span class="text-gray-700">Portfolio / Website</span>
+          <input type="text" name="portfolio"
+                 value="{{ cv.additional_details.portfolio or '' }}"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm" />
+        </label>
 
-    <label class="block">
-      <span class="text-gray-700">Publications (comma separated)</span>
-      <input type="text" name="publications"
-             value="{{ cv.additional_details.publications | join(', ') }}"
-             class="mt-1 w-full border rounded-lg p-3" />
-    </label>
+        <label class="block">
+          <span class="text-gray-700">Thesis / Dissertation</span>
+          <input type="text" name="thesis"
+                 value="{{ cv.additional_details.thesis or '' }}"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm" />
+        </label>
 
-    <label class="block">
-      <span class="text-gray-700">Awards (comma separated)</span>
-      <input type="text" name="awards"
-             value="{{ cv.additional_details.awards | join(', ') }}"
-             class="mt-1 w-full border rounded-lg p-3" />
-    </label>
+        <label class="block">
+          <span class="text-gray-700">Publications</span>
+          <input type="text" name="publications"
+                 value="{{ cv.additional_details.publications | join(', ') }}"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm" />
+        </label>
 
-    <label class="block">
-      <span class="text-gray-700">Volunteering (comma separated)</span>
-      <input type="text" name="volunteering"
-             value="{{ cv.additional_details.volunteering | join(', ') }}"
-             class="mt-1 w-full border rounded-lg p-3" />
-    </label>
+        <label class="block">
+          <span class="text-gray-700">Awards</span>
+          <input type="text" name="awards"
+                 value="{{ cv.additional_details.awards | join(', ') }}"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm" />
+        </label>
 
-    <label class="block">
-      <span class="text-gray-700">Interests (comma separated)</span>
-      <input type="text" name="interests"
-             value="{{ cv.additional_details.interests | join(', ') }}"
-             class="mt-1 w-full border rounded-lg p-3" />
-    </label>
+        <label class="block">
+          <span class="text-gray-700">Volunteering</span>
+          <input type="text" name="volunteering"
+                 value="{{ cv.additional_details.volunteering | join(', ') }}"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm" />
+        </label>
 
-    <label class="block">
-      <span class="text-gray-700">Other</span>
-      <textarea name="other" rows="3"
-                class="mt-1 w-full border rounded-lg p-3">{{ cv.additional_details.other }}</textarea>
-    </label>
+        <label class="block">
+          <span class="text-gray-700">Interests</span>
+          <input type="text" name="interests"
+                 value="{{ cv.additional_details.interests | join(', ') }}"
+                 class="mt-1 w-full border rounded-xl p-3 shadow-sm" />
+        </label>
 
-  </div>
-</div>
+        <label class="block">
+          <span class="text-gray-700">Other</span>
+          <textarea name="other" rows="3"
+                    class="mt-1 w-full border rounded-xl p-3 shadow-sm">{{ cv.additional_details.other }}</textarea>
+        </label>
+
+      </div>
+    </div>
 
 
-    <button class="w-full bg-blue-600 text-white py-3 rounded-lg shadow hover:bg-blue-700 transition">
-      Save Changes
+    <!-- SUBMIT BUTTON -->
+    <button
+      class="w-full bg-blue-600 text-white py-4 rounded-full text-lg font-semibold
+             hover:bg-blue-700 shadow-md transition">
+      Save & Continue
     </button>
 
   </form>
 </div>
-
-<!-- JS FOR ADD/REMOVE EXPERIENCE & EDUCATION -->
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-
-  // EXPERIENCE ADDING
-  const expContainer = document.getElementById("experience_container");
-  const expCountInput = document.getElementById("exp_count");
-  document.getElementById("addExperienceBtn").addEventListener("click", () => {
-    let i = parseInt(expCountInput.value);
-    expCountInput.value = i + 1;
-
-    const block = document.createElement("div");
-    block.className = "experience-block p-4 border rounded-lg mb-4 bg-gray-50";
-
-    block.innerHTML = `
-      <label class="block text-sm text-gray-600 mb-1">Role</label>
-      <input type="text" name="exp_role_${i}" class="w-full border rounded-lg p-2 mb-3" />
-
-      <label class="block text-sm text-gray-600 mb-1">Company</label>
-      <input type="text" name="exp_company_${i}" class="w-full border rounded-lg p-2 mb-3" />
-
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm text-gray-600 mb-1">Start Date</label>
-          <input type="text" name="exp_start_${i}" class="w-full border rounded-lg p-2" />
-        </div>
-        <div>
-          <label class="block text-sm text-gray-600 mb-1">End Date</label>
-          <input type="text" name="exp_end_${i}" class="w-full border rounded-lg p-2" />
-        </div>
-      </div>
-
-      <label class="block text-sm text-gray-600 mb-1 mt-3">Description</label>
-      <textarea name="exp_desc_${i}" class="w-full border rounded-lg p-2" rows="3"></textarea>
-    `;
-
-    expContainer.appendChild(block);
-  });
-
-  // EDUCATION ADDING
-  const eduContainer = document.getElementById("education_container");
-  const eduCountInput = document.getElementById("edu_count");
-  document.getElementById("addEducationBtn").addEventListener("click", () => {
-    let j = parseInt(eduCountInput.value);
-    eduCountInput.value = j + 1;
-
-    const block = document.createElement("div");
-    block.className = "education-block p-4 border rounded-lg mb-4 bg-gray-50";
-
-    block.innerHTML = `
-      <label class="block text-sm text-gray-600 mb-1">Degree</label>
-      <input type="text" name="edu_degree_${j}" class="w-full border rounded-lg p-2 mb-3" />
-
-      <label class="block text-sm text-gray-600 mb-1">Institution</label>
-      <input type="text" name="edu_institution_${j}" class="w-full border rounded-lg p-2 mb-3" />
-
-      <label class="block text-sm text-gray-600 mb-1">Graduation Year</label>
-      <input type="text" name="edu_year_${j}" class="w-full border rounded-lg p-2" />
-    `;
-
-    eduContainer.appendChild(block);
-  });
-
-});
-</script>
 
 {% endblock %}

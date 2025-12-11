@@ -2,33 +2,34 @@
 
 {% block content %}
 
-<div class="max-w-6xl mx-auto py-8">
+<div class="max-w-6xl mx-auto py-8 px-4">
 
-  <!-- Header w/ mode indicators -->
+  <!-- HEADER AND MODE CHIPS -->
   <div class="mb-6">
-    <h1 class="text-3xl font-semibold text-gray-900 flex items-center gap-3">
+    <h1 class="text-3xl font-semibold text-gray-900 flex flex-wrap items-center gap-3">
       Welcome back, {{ current_user.profile.first_name or current_user.email }}
 
-      <!-- Application Mode Chip -->
-      <span class="px-3 py-1 text-xs rounded-full
+      <!-- Application mode chip -->
+      <span
+        class="px-3 py-1 text-xs rounded-full
         {% if profile.application_mode == 'auto' %}
           bg-green-100 text-green-700
         {% else %}
           bg-yellow-100 text-yellow-700
-        {% endif %}
-      ">
+        {% endif %}">
         {{ profile.application_mode | capitalize }} mode
       </span>
 
-      <!-- Matching Mode Chip -->
+      <!-- Matching mode chip -->
       <span class="px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-700">
         {{ profile.match_mode | capitalize }} matching
       </span>
     </h1>
 
-    <p class="text-gray-600 mt-1">Here’s what’s happening with your job search.</p>
+    <p class="text-gray-600 mt-1">
+      Here is what is happening with your job search.
+    </p>
   </div>
-
 
   <!-- TOP ACTION BAR -->
   <div class="flex flex-wrap gap-3 mb-10">
@@ -48,329 +49,598 @@
       Preferences
     </a>
 
-
   </div>
 
-
-
-  <!-- Stats Grid -->
+  <!-- STATS GRID -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
 
     <!-- Applications sent -->
     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
       <p class="text-gray-600 text-sm mb-1">Applications sent</p>
       <p class="text-3xl font-bold text-gray-900">{{ stats.applications_sent }}</p>
-      <p class="text-sm text-green-600 mt-1">Automation running {{ profile.application_frequency }}</p>
+      <p class="text-sm text-green-600 mt-1">
+        Automation running {{ profile.application_frequency }}
+      </p>
     </div>
 
-    <!-- Matches found -->
+    <!-- Matching jobs -->
     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
       <p class="text-gray-600 text-sm mb-1">Matching jobs</p>
       <p class="text-3xl font-bold text-gray-900">{{ stats.match_count }}</p>
       <p class="text-sm text-gray-500 mt-1">Based on your preferences</p>
     </div>
 
-
   </div>
 
+  <!-- APPLICATION ACTIVITY SECTION -->
+  <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-10">
 
-<!-- Application Activity Section -->
-<div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-10">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <h2 class="text-xl font-semibold text-gray-900">
+        Application activity
+      </h2>
+      <a href="{{ url_for('preferences.preferences_page') }}"
+         class="text-primary hover:underline text-sm">
+        Adjust preferences
+      </a>
+    </div>
 
-  <div class="flex items-center justify-between mb-6">
-    <h2 class="text-xl font-semibold text-gray-900">Application Activity</h2>
-    <a href="{{ url_for('preferences.preferences_page') }}" class="text-primary hover:underline text-sm">
-      Adjust preferences
-    </a>
-  </div>
+    {% if activity and activity|length > 0 %}
 
-  {% if activity and activity|length > 0 %}
-  <div class="max-h-96 overflow-y-auto border-t border-gray-200">
-  <table class="w-full text-left">
+      <!-- DESKTOP TABLE -->
+      <div class="max-h-96 overflow-y-auto border-t border-gray-200 hidden md:block">
+        <div class="overflow-x-auto">
+          <table id="activityTable" class="w-full text-left text-sm min-w-[720px]">
 
-    <thead>
-      <tr class="text-gray-600 text-sm border-b">
-        <th class="py-2">Job Title</th>
-        <th class="py-2">Company</th>
-        <th class="py-2">Status</th>
-        <th class="py-2">Date</th>
-        <th class="py-2 text-right">Actions</th>
-      </tr>
-    </thead>
+            <thead class="bg-gray-50">
+              <tr class="text-gray-600 border-b">
 
-    <tbody>
-      {% for app in activity %}
-      <tr class="border-b hover:bg-gray-50">
+                <th class="py-3 px-2 cursor-pointer select-none"
+                    data-sort-key="job_title" data-sort-type="text">
+                  <div class="flex items-center gap-1">
+                    <span>Job title</span>
+                    <span class="text-xs opacity-60 sort-icon">↕</span>
+                  </div>
+                </th>
 
-<td class="py-3 font-medium text-gray-900 flex items-center gap-2">
+                <th class="py-3 px-2 cursor-pointer select-none"
+                    data-sort-key="company" data-sort-type="text">
+                  <div class="flex items-center gap-1">
+                    <span>Company</span>
+                    <span class="text-xs opacity-60 sort-icon">↕</span>
+                  </div>
+                </th>
 
-  <!-- Job title (clickable) -->
-  <a href="{{ app.job_url }}" target="_blank" rel="noopener noreferrer"
-     class="inline-flex items-center gap-1 group">
-    <span class="text-gray-900">{{ app.job_title }}</span>
+                <th class="py-3 px-2 cursor-pointer select-none"
+                    data-sort-key="status" data-sort-type="text">
+                  <div class="flex items-center gap-1">
+                    <span>Status</span>
+                    <span class="text-xs opacity-60 sort-icon">↕</span>
+                  </div>
+                </th>
 
-    <!-- External link box icon -->
-    <span class="inline-block w-4 h-4 border border-gray-300 rounded-sm flex items-center justify-center text-[10px] group-hover:border-gray-400 transition">
-      ↗
-    </span>
-  </a>
+                <th class="py-3 px-2 cursor-pointer select-none"
+                    data-sort-key="date" data-sort-type="num">
+                  <div class="flex items-center gap-1">
+                    <span>Date</span>
+                    <span class="text-xs opacity-60 sort-icon">↕</span>
+                  </div>
+                </th>
 
-</td>
+                <th class="py-3 px-2 text-right">
+                  Actions
+                </th>
 
+              </tr>
+            </thead>
 
-        <!-- Company -->
-        <td class="py-3 text-gray-700">
-          {{ app.company }}
-        </td>
+            <tbody id="activityBody">
+              {% for app in activity %}
+              <tr class="border-b hover:bg-gray-50 transition">
 
-        <!-- Status -->
-        <td class="py-3">
-          {% if app.status == "success" or app.status == "manual_success" %}
-            <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">Successful</span>
+                <!-- Job title -->
+                <td class="py-3 px-2 font-medium text-gray-900"
+                    data-col="job_title"
+                    data-sort-value="{{ app.job_title|lower }}">
+                  <a href="{{ app.job_url }}" target="_blank" rel="noopener noreferrer"
+                     class="inline-flex items-center gap-1 group">
+                    <span class="text-gray-900">
+                      {{ app.job_title }}
+                    </span>
+                    <span class="inline-block w-4 h-4 border border-gray-300 rounded-sm
+                                 flex items-center justify-center text-[10px]
+                                 group-hover:border-gray-400 transition">
+                      ↗
+                    </span>
+                  </a>
+                </td>
 
-          {% elif app.status == "pending" %}
-            <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">Pending</span>
+                <!-- Company -->
+                <td class="py-3 px-2 text-gray-700"
+                    data-col="company"
+                    data-sort-value="{{ app.company|lower }}">
+                  {{ app.company }}
+                </td>
 
-            {% elif app.status == "processing" %}
-            <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">Processing</span>
+                <!-- Status -->
+                <td class="py-3 px-2"
+                    data-col="status"
+                    data-sort-value="{{ app.status|lower }}">
+                  {% if app.status == "success" or app.status == "manual_success" %}
+                    <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
+                      Successful
+                    </span>
+                  {% elif app.status == "pending" %}
+                    <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">
+                      Pending
+                    </span>
+                  {% elif app.status == "processing" %}
+                    <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">
+                      Processing
+                    </span>
+                  {% elif app.status == "failed" %}
+                    <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700">
+                      Failed
+                    </span>
+                  {% elif app.status == "cancelled" %}
+                    <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
+                      Cancelled
+                    </span>
+                  {% endif %}
+                </td>
 
+                <!-- Date -->
+                <td class="py-3 px-2 text-gray-600 text-sm"
+                    data-col="date"
+                    data-sort-value="{{ app.created_at.timestamp() }}">
+                  {{ app.created_at.strftime('%d %b %Y') }}
+                </td>
 
-          {% elif app.status == "failed" %}
-            <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700">Failed</span>
+                <!-- Actions -->
+                <td class="py-3 px-2 text-right align-top">
 
-          {% elif app.status == "cancelled" %}
-            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">Cancelled</span>
-          {% endif %}
-        </td>
+                  {% if app.status == "success" %}
 
-        <!-- Date -->
-        <td class="py-3 text-gray-600 text-sm">
-          {{ app.created_at.strftime('%d %b %Y') }}
-        </td>
+                    <a href="{{ url_for('dashboard.view_cv_variant', app_id=app.id) }}"
+                       class="text-blue-600 hover:text-blue-700 text-xs md:text-sm mr-3">
+                      View CV variant
+                    </a>
 
-        <!-- Actions -->
-        <td class="py-3 text-right">
+                    <a href="{{ url_for('dashboard.view_application_screenshot', app_id=app.id) }}"
+                       class="text-blue-600 hover:text-blue-700 text-xs md:text-sm">
+                      View screenshot
+                    </a>
 
-          {% if app.status == "success" %}
+                  {% elif app.status == "pending" %}
 
-            <a href="{{ url_for('dashboard.view_cv_variant', app_id=app.id) }}"
-               class="text-blue-600 hover:text-blue-700 text-sm mr-3">
-              View CV Variant
-            </a>
+                    <form method="POST"
+                          class="inline"
+                          action="{{ url_for('dashboard.cancel_application', app_id=app.id) }}">
+                      <button class="text-red-600 hover:text-red-700 text-xs md:text-sm">
+                        Cancel
+                      </button>
+                    </form>
 
-<a href="{{ url_for('dashboard.view_application_screenshot', app_id=app.id) }}"
-   class="text-blue-600 hover:text-blue-700 text-sm">
-  View Screenshot
-</a>
+                  {% elif app.status == "failed" %}
 
+                    <form method="POST"
+                          class="inline"
+                          action="{{ url_for('dashboard.retry_application', app_id=app.id) }}">
+                      <button class="text-yellow-600 hover:text-yellow-700 text-xs md:text-sm mr-3">
+                        Request retry
+                      </button>
+                    </form>
 
-          {% elif app.status == "pending" %}
+                    <form method="POST"
+                          class="inline"
+                          action="{{ url_for('dashboard.report_application_issue', app_id=app.id) }}">
+                      <button class="text-red-600 hover:text-red-700 text-xs md:text-sm mr-3">
+                        Report
+                      </button>
+                    </form>
 
-            <form method="POST"
-                  class="inline"
-                  action="{{ url_for('dashboard.cancel_application', app_id=app.id) }}">
-              <button class="text-red-600 hover:text-red-700 text-sm">
-                Cancel
-              </button>
-            </form>
+                    <a href="{{ url_for('dashboard.view_error', app_id=app.id) }}"
+                       class="text-gray-600 hover:text-gray-700 text-xs md:text-sm">
+                      View error
+                    </a>
 
-          {% elif app.status == "failed" %}
+                  {% elif app.status == "processing" %}
+                    <span class="text-gray-500 text-xs md:text-sm">
+                      Processing in background
+                    </span>
+                  {% endif %}
 
-            <form method="POST"
-                  class="inline"
-                  action="{{ url_for('dashboard.retry_application', app_id=app.id) }}">
-              <button class="text-yellow-600 hover:text-yellow-700 text-sm mr-3">
-                Request Retry
-              </button>
-            </form>
+                </td>
 
-            <form method="POST"
-                  class="inline"
-                  action="{{ url_for('dashboard.report_application_issue', app_id=app.id) }}">
-              <button class="text-red-600 hover:text-red-700 text-sm mr-3">
-                Report
-              </button>
-            </form>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-            <a href="{{ url_for('dashboard.view_error', app_id=app.id) }}"
-               class="text-gray-600 hover:text-gray-700 text-sm">
-              View Error
-            </a>
+      <!-- MOBILE CARD LIST -->
+      <div class="border-t border-gray-200 mt-4 space-y-4 md:hidden max-h-96 overflow-y-auto pt-4">
+        {% for app in activity %}
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 flex flex-col gap-3">
 
-          {% endif %}
-
-        </td>
-
-      </tr>
-      {% endfor %}
-    </tbody>
-    </table>
-</div>
-
-
-  {% else %}
-    <p class="text-gray-600">No application activity has been recorded yet. As soon as your automation applies to roles, they will appear here.</p>
-  {% endif %}
-
-</div>
-
-    {% if manual_required and manual_required|length > 0 %}
-<div class="mb-8">
-    <h2 class="text-xl font-semibold mb-3">Manual actions required</h2>
-
-    <div class="space-y-4">
-        {% for app in manual_required %}
-        <div class="p-4 border rounded-lg bg-yellow-50 flex justify-between items-center">
-
+          <!-- Top row: title and status -->
+          <div class="flex items-start justify-between gap-3">
             <div>
-                <div class="font-medium text-gray-800">{{ app.job_title }}</div>
-                <div class="text-sm text-gray-600">{{ app.company }}</div>
-
-                {% if app.error_message %}
-                <div class="text-xs text-gray-500 mt-1">{{ app.error_message }}</div>
-                {% endif %}
+              <a href="{{ app.job_url }}" target="_blank" rel="noopener noreferrer"
+                 class="inline-flex items-center gap-1 group">
+                <span class="font-semibold text-gray-900">
+                  {{ app.job_title }}
+                </span>
+                <span class="inline-block w-4 h-4 border border-gray-300 rounded-sm
+                             flex items-center justify-center text-[10px]
+                             group-hover:border-gray-400 transition">
+                  ↗
+                </span>
+              </a>
+              <div class="text-xs text-gray-500 mt-1">
+                {{ app.company }} · {{ app.created_at.strftime('%d %b %Y') }}
+              </div>
             </div>
 
-<div class="flex items-center space-x-4" id="manual-box-{{ app.id }}">
+            <div>
+              {% if app.status == "success" or app.status == "manual_success" %}
+                <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
+                  Successful
+                </span>
+              {% elif app.status == "pending" %}
+                <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">
+                  Pending
+                </span>
+              {% elif app.status == "processing" %}
+                <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">
+                  Processing
+                </span>
+              {% elif app.status == "failed" %}
+                <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700">
+                  Failed
+                </span>
+              {% elif app.status == "cancelled" %}
+                <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
+                  Cancelled
+                </span>
+              {% endif %}
+            </div>
+          </div>
 
-    {% if app.cv_variant_url %}
-    <a href="{{ url_for('dashboard.view_cv_variant', app_id=app.id) }}"
-        class="text-blue-600 underline text-sm">
-        Download CV
-    </a>
-    {% endif %}
+          <!-- Actions row -->
+          <div class="pt-2 border-t border-gray-100 flex flex-wrap gap-3 justify-end">
 
-    <!-- Always show Apply Manually button -->
-    <button
-        class="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700"
-        onclick="startManualApply({{ app.id }}, '{{ app.job_url }}')"
-        id="start-btn-{{ app.id }}"
-    >
-        Apply manually now
-    </button>
+            {% if app.status == "success" %}
 
-    <!-- Only show this AFTER user clicks Apply manually now -->
-    {% if app.manual_started %}
-    <button
-        class="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700"
-        onclick="completeManualApply({{ app.id }})"
-        id="complete-btn-{{ app.id }}"
-    >
-        Mark Application Completed
-    </button>
-    {% endif %}
+              <a href="{{ url_for('dashboard.view_cv_variant', app_id=app.id) }}"
+                 class="text-blue-600 hover:text-blue-700 text-xs font-medium">
+                View CV variant
+              </a>
 
-</div>
+              <a href="{{ url_for('dashboard.view_application_screenshot', app_id=app.id) }}"
+                 class="text-blue-600 hover:text-blue-700 text-xs font-medium">
+                View screenshot
+              </a>
 
+            {% elif app.status == "pending" %}
 
+              <form method="POST"
+                    class="inline"
+                    action="{{ url_for('dashboard.cancel_application', app_id=app.id) }}">
+                <button class="text-red-600 hover:text-red-700 text-xs font-medium">
+                  Cancel
+                </button>
+              </form>
 
+            {% elif app.status == "failed" %}
 
+              <form method="POST"
+                    class="inline"
+                    action="{{ url_for('dashboard.retry_application', app_id=app.id) }}">
+                <button class="text-yellow-600 hover:text-yellow-700 text-xs font-medium">
+                  Request retry
+                </button>
+              </form>
+
+              <form method="POST"
+                    class="inline"
+                    action="{{ url_for('dashboard.report_application_issue', app_id=app.id) }}">
+                <button class="text-red-600 hover:text-red-700 text-xs font-medium">
+                  Report
+                </button>
+              </form>
+
+              <a href="{{ url_for('dashboard.view_error', app_id=app.id) }}"
+                 class="text-gray-600 hover:text-gray-700 text-xs font-medium">
+                View error
+              </a>
+
+            {% elif app.status == "processing" %}
+              <span class="text-gray-500 text-xs">
+                Processing in background
+              </span>
+            {% endif %}
+
+          </div>
 
         </div>
         {% endfor %}
+      </div>
+
+    {% else %}
+      <p class="text-gray-600">
+        No application activity has been recorded yet. As soon as your automation applies to roles, they will appear here.
+      </p>
+    {% endif %}
+
+  </div>
+
+  <!-- MANUAL ACTIONS REQUIRED -->
+  {% if manual_required and manual_required|length > 0 %}
+  <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-10">
+
+    <h2 class="text-xl font-semibold mb-4 text-gray-900">
+      Manual actions required
+    </h2>
+
+    <div class="space-y-4">
+      {% for app in manual_required %}
+      <div class="p-4 border rounded-xl bg-yellow-50 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+
+        <div>
+          <div class="font-medium text-gray-800">
+            {{ app.job_title }}
+          </div>
+          <div class="text-sm text-gray-600">
+            {{ app.company }}
+          </div>
+
+          {% if app.error_message %}
+          <div class="text-xs text-gray-500 mt-1">
+            {{ app.error_message }}
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="flex items-center gap-4" id="manual-box-{{ app.id }}">
+
+          {% if app.cv_variant_url %}
+          <a href="{{ url_for('dashboard.view_cv_variant', app_id=app.id) }}"
+             class="text-blue-600 underline text-xs md:text-sm">
+            Download CV
+          </a>
+          {% endif %}
+
+          <button
+            class="bg-red-600 text-white px-4 py-2 rounded-md text-xs md:text-sm font-medium hover:bg-red-700"
+            onclick="startManualApply({{ app.id }}, '{{ app.job_url }}')"
+            id="start-btn-{{ app.id }}">
+            Apply manually now
+          </button>
+
+          {% if app.manual_started %}
+          <button
+            class="bg-green-600 text-white px-4 py-2 rounded-md text-xs md:text-sm font-medium hover:bg-green-700"
+            onclick="completeManualApply({{ app.id }})"
+            id="complete-btn-{{ app.id }}">
+            Mark application completed
+          </button>
+          {% endif %}
+
+        </div>
+
+      </div>
+      {% endfor %}
     </div>
-</div>
-{% endif %}
 
+  </div>
+  {% endif %}
 
-    <!-- Top Matches Section -->
-<div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-10">
+  <!-- TOP MATCHES SECTION -->
+  <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-10">
 
-    <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-semibold text-gray-900">Top Matches for You</h2>
-        <a href="{{ url_for('preferences.preferences_page') }}" class="text-primary hover:underline text-sm">
-            Improve matching
-        </a>
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <h2 class="text-xl font-semibold text-gray-900">
+        Top matches for you
+      </h2>
+      <a href="{{ url_for('preferences.preferences_page') }}"
+         class="text-primary hover:underline text-sm">
+        Improve matching
+      </a>
     </div>
 
     {% if matches and matches|length > 0 %}
-    <div class="max-h-96 overflow-y-auto border-t border-gray-200">
-        <table class="w-full text-left">
 
-            <thead>
-                <tr class="text-gray-600 text-sm border-b">
-                    <th class="py-2">Job Title</th>
-                    <th class="py-2">Company</th>
-                    <th class="py-2">Remote</th>
-                    <th class="py-2">Score</th>
-                    <th class="py-2 text-right">Actions</th>
-                </tr>
+      <!-- DESKTOP TABLE -->
+      <div class="max-h-96 overflow-y-auto border-t border-gray-200 hidden md:block">
+        <div class="overflow-x-auto">
+          <table id="matchesTable" class="w-full text-left text-sm min-w-[720px]">
+
+            <thead class="bg-gray-50">
+              <tr class="text-gray-600 border-b">
+
+                <th class="py-3 px-2 cursor-pointer select-none"
+                    data-sort-key="job_title" data-sort-type="text">
+                  <div class="flex items-center gap-1">
+                    <span>Job title</span>
+                    <span class="text-xs opacity-60 sort-icon">↕</span>
+                  </div>
+                </th>
+
+                <th class="py-3 px-2 cursor-pointer select-none"
+                    data-sort-key="company" data-sort-type="text">
+                  <div class="flex items-center gap-1">
+                    <span>Company</span>
+                    <span class="text-xs opacity-60 sort-icon">↕</span>
+                  </div>
+                </th>
+
+                <th class="py-3 px-2 cursor-pointer select-none"
+                    data-sort-key="remote" data-sort-type="text">
+                  <div class="flex items-center gap-1">
+                    <span>Location</span>
+                    <span class="text-xs opacity-60 sort-icon">↕</span>
+                  </div>
+                </th>
+
+                <th class="py-3 px-2 cursor-pointer select-none"
+                    data-sort-key="score" data-sort-type="num">
+                  <div class="flex items-center gap-1">
+                    <span>Score</span>
+                    <span class="text-xs opacity-60 sort-icon">↕</span>
+                  </div>
+                </th>
+
+                <th class="py-3 px-2 text-right">
+                  Actions
+                </th>
+
+              </tr>
             </thead>
 
-            <tbody>
-{% for m, job_title, company, city, state, country, remote in matches %}
-<tr class="border-b hover:bg-gray-50">
+            <tbody id="matchesBody">
+              {% for m, job_title, company, city, state, country, remote in matches %}
+              <tr class="border-b hover:bg-gray-50 transition">
 
-    <!-- Job Title -->
-    <td class="py-3 font-medium text-gray-900">
-        <a href="{{ m.job_url }}" target="_blank" class="group inline-flex items-center gap-1">
-            {{ job_title or "Unknown title" }}
-            <span class="inline-block w-4 h-4 border border-gray-300 rounded-sm
-                         flex items-center justify-center text-[10px]
-                         group-hover:border-gray-400 transition">
-                ↗
-            </span>
-        </a>
-    </td>
+                <!-- Job title -->
+                <td class="py-3 px-2 font-medium text-gray-900"
+                    data-col="job_title"
+                    data-sort-value="{{ (job_title or 'Unknown title')|lower }}">
+                  <a href="{{ m.job_url }}" target="_blank"
+                     class="group inline-flex items-center gap-1">
+                    {{ job_title or "Unknown title" }}
+                    <span class="inline-block w-4 h-4 border border-gray-300 rounded-sm
+                                 flex items-center justify-center text-[10px]
+                                 group-hover:border-gray-400 transition">
+                      ↗
+                    </span>
+                  </a>
+                </td>
 
-    <!-- Company -->
-    <td class="py-3 text-gray-700">
-        {{ company or "Unknown company" }}
-    </td>
+                <!-- Company -->
+                <td class="py-3 px-2 text-gray-700"
+                    data-col="company"
+                    data-sort-value="{{ (company or 'Unknown company')|lower }}">
+                  {{ company or "Unknown company" }}
+                </td>
 
-    <!-- Location / Remote -->
-    <td class="py-3 text-gray-600 text-sm">
-        {% if remote %}
-            <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">Remote</span>
-        {% else %}
-            {{ city }}, {{ state }}
-        {% endif %}
-    </td>
+                <!-- Location or remote -->
+                <td class="py-3 px-2 text-gray-600 text-sm"
+                    data-col="remote"
+                    data-sort-value="{% if remote %}remote{% else %}local{% endif %}">
+                  {% if remote %}
+                    <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                      Remote
+                    </span>
+                  {% else %}
+                    {{ city }}, {{ state }}
+                  {% endif %}
+                </td>
 
-    <!-- Score -->
-    <td class="py-3 font-semibold text-gray-800">
-        {{ "%.2f"|format(m.score) }}
-    </td>
+                <!-- Score -->
+                <td class="py-3 px-2 font-semibold text-gray-800"
+                    data-col="score"
+                    data-sort-value="{{ m.score or 0 }}">
+                  {{ "%.2f"|format(m.score) }}
+                </td>
 
-    <!-- Apply Button -->
-    <td class="py-3 text-right">
-        <form method="POST"
-              action="{{ url_for('dashboard.apply_from_match', match_id=m.id) }}">
-            <button class="text-blue-600 hover:text-blue-700 text-sm">
-                Apply
-            </button>
-        </form>
-    </td>
+                <!-- Apply -->
+                <td class="py-3 px-2 text-right">
+                  <form method="POST"
+                        action="{{ url_for('dashboard.apply_from_match', match_id=m.id) }}">
+                    <button class="text-blue-600 hover:text-blue-700 text-xs md:text-sm">
+                      Apply
+                    </button>
+                  </form>
+                </td>
 
-</tr>
-{% endfor %}
-
+              </tr>
+              {% endfor %}
             </tbody>
 
-        </table>
-    </div>
+          </table>
+        </div>
+      </div>
+
+      <!-- MOBILE CARD LIST -->
+      <div class="border-t border-gray-200 mt-4 space-y-4 md:hidden max-h-96 overflow-y-auto pt-4">
+        {% for m, job_title, company, city, state, country, remote in matches %}
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 flex flex-col gap-3">
+
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <a href="{{ m.job_url }}" target="_blank"
+                 class="group inline-flex items-center gap-1">
+                <span class="font-semibold text-gray-900">
+                  {{ job_title or "Unknown title" }}
+                </span>
+                <span class="inline-block w-4 h-4 border border-gray-300 rounded-sm
+                             flex items-center justify-center text-[10px]
+                             group-hover:border-gray-400 transition">
+                  ↗
+                </span>
+              </a>
+              <div class="text-xs text-gray-500 mt-1">
+                {{ company or "Unknown company" }}
+                {% if not remote and city %}
+                  · {{ city }}{% if state %}, {{ state }}{% endif %}
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="text-right">
+              {% if remote %}
+                <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                  Remote
+                </span>
+              {% else %}
+                <span class="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
+                  Local
+                </span>
+              {% endif %}
+              <div class="text-xs text-gray-500 mt-1">
+                Score {{ "%.2f"|format(m.score) }}
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-gray-100 flex justify-end">
+            <form method="POST"
+                  action="{{ url_for('dashboard.apply_from_match', match_id=m.id) }}">
+              <button class="text-blue-600 hover:text-blue-700 text-xs font-medium">
+                Apply
+              </button>
+            </form>
+          </div>
+
+        </div>
+        {% endfor %}
+      </div>
 
     {% else %}
-        <p class="text-gray-600">No matches found yet. Adjust your preferences to improve matching.</p>
+      <p class="text-gray-600">
+        No matches found yet. Adjust your preferences to improve matching.
+      </p>
     {% endif %}
 
-</div>
+  </div>
 
-
-
-
-  <!-- Automation Status -->
+  <!-- AUTOMATION STATUS -->
   <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
-    <h2 class="text-xl font-semibold text-gray-900 mb-4">Application Automation</h2>
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">
+      Application automation
+    </h2>
 
-    <div class="flex items-center mb-4">
-      <div class="h-3 w-3 rounded-full 
+    <div class="flex items-center mb-3">
+      <div class="h-3 w-3 rounded-full
         {% if automation_running %}
           bg-green-500
         {% else %}
           bg-red-500
         {% endif %}
-        mr-2"></div>
+        mr-2">
+      </div>
 
       <p class="text-gray-700">
         {% if automation_running %}
@@ -380,78 +650,129 @@
         {% endif %}
       </p>
     </div>
-            <div class="text-sm text-gray-600 mt-2">
-        Applying mode: <strong>{{ profile.application_mode }}</strong><br>
-        Matching mode: <strong>{{ profile.match_mode }}</strong>
-      </div>
-      <br>
 
-    <a href="{{ url_for('preferences.preferences_page') }}" 
-       class="text-primary hover:underline text-sm">
+    <div class="text-sm text-gray-600 mt-2">
+      Applying mode:
+      <strong>{{ profile.application_mode }}</strong><br>
+      Matching mode:
+      <strong>{{ profile.match_mode }}</strong>
+    </div>
+
+    <a href="{{ url_for('preferences.preferences_page') }}"
+       class="mt-4 inline-block text-primary hover:underline text-sm">
       Change settings
     </a>
   </div>
 
 </div>
 
+<!-- SORTING AND MANUAL APPLY SCRIPTS -->
 <script>
-async function startManualApply(appId, jobUrl) {
-    // Open job URL right away
-    window.open(jobUrl, '_blank');
+function initSortableTable(tableId) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
 
-    // Send AJAX request to mark manual_started = true
-    const res = await fetch(`/application/${appId}/manual-start`, {
-        method: "POST",
-        headers: { "X-Requested-With": "XMLHttpRequest" }
+  const body = table.querySelector("tbody");
+  const headers = table.querySelectorAll("th[data-sort-key]");
+  if (!body || headers.length === 0) return;
+
+  const state = { key: null, direction: 1 };
+
+  headers.forEach(th => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sortKey;
+      const type = th.dataset.sortType || "text";
+
+      if (state.key === key) {
+        state.direction = state.direction * -1;
+      } else {
+        state.key = key;
+        state.direction = 1;
+      }
+
+      headers.forEach(h => h.classList.remove("text-blue-600", "font-semibold"));
+      th.classList.add("text-blue-600", "font-semibold");
+
+      const rows = Array.from(body.querySelectorAll("tr"));
+
+      rows.sort((a, b) => {
+        const aCell = a.querySelector(`td[data-col="${key}"]`);
+        const bCell = b.querySelector(`td[data-col="${key}"]`);
+
+        if (!aCell || !bCell) return 0;
+
+        const aRaw = aCell.dataset.sortValue ?? aCell.textContent.trim();
+        const bRaw = bCell.dataset.sortValue ?? bCell.textContent.trim();
+
+        if (type === "num") {
+          const aNum = parseFloat(aRaw) || 0;
+          const bNum = parseFloat(bRaw) || 0;
+          return (aNum - bNum) * state.direction;
+        }
+
+        return String(aRaw).localeCompare(String(bRaw)) * state.direction;
+      });
+
+      rows.forEach(r => body.appendChild(r));
     });
+  });
+}
 
-    const data = await res.json();
-    if (!data.success) {
-        alert("Could not mark manual application as started.");
-        return;
-    }
+document.addEventListener("DOMContentLoaded", () => {
+  initSortableTable("activityTable");
+  initSortableTable("matchesTable");
+});
 
-    // ADD the green button next to the red button (do NOT remove the red one)
-    const box = document.getElementById(`manual-box-${appId}`);
+async function startManualApply(appId, jobUrl) {
+  window.open(jobUrl, "_blank");
 
-    // Only add if it's not already present
-    if (!document.getElementById(`complete-btn-${appId}`)) {
-        const greenBtn = document.createElement("button");
-        greenBtn.id = `complete-btn-${appId}`;
-        greenBtn.className =
-            "bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700";
-        greenBtn.innerText = "Mark Application Completed";
-        greenBtn.onclick = () => completeManualApply(appId);
+  const res = await fetch(`/application/${appId}/manual-start`, {
+    method: "POST",
+    headers: { "X-Requested-With": "XMLHttpRequest" }
+  });
 
-        box.appendChild(greenBtn);
-    }
+  const data = await res.json();
+  if (!data.success) {
+    alert("Could not mark manual application as started.");
+    return;
+  }
+
+  const box = document.getElementById(`manual-box-${appId}`);
+  if (!box) return;
+
+  if (!document.getElementById(`complete-btn-${appId}`)) {
+    const btn = document.createElement("button");
+    btn.id = `complete-btn-${appId}`;
+    btn.className = "bg-green-600 text-white px-4 py-2 rounded-md text-xs md:text-sm font-medium hover:bg-green-700";
+    btn.innerText = "Mark application completed";
+    btn.onclick = () => completeManualApply(appId);
+    box.appendChild(btn);
+  }
 }
 
 async function completeManualApply(appId) {
-    if (!confirm("Confirm that you have manually completed this application.")) return;
+  if (!confirm("Confirm that you have manually completed this application.")) return;
 
-    const res = await fetch(`/application/${appId}/manual-complete`, {
-        method: "POST",
-        headers: { "X-Requested-With": "XMLHttpRequest" }
-    });
+  const res = await fetch(`/application/${appId}/manual-complete`, {
+    method: "POST",
+    headers: { "X-Requested-With": "XMLHttpRequest" }
+  });
 
-    const data = await res.json();
-    if (!data.success) {
-        alert("Could not mark as completed.");
-        return;
-    }
+  const data = await res.json();
+  if (!data.success) {
+    alert("Could not mark as completed.");
+    return;
+  }
 
-    // Mark UI however you like — here we simply disable the green button
-    const completeBtn = document.getElementById(`complete-btn-${appId}`);
-    if (completeBtn) {
-        completeBtn.innerText = "Completed ✓";
-        completeBtn.disabled = true;
-        completeBtn.classList.add("opacity-70", "cursor-not-allowed");
-    }
+  const btn = document.getElementById(`complete-btn-${appId}`);
+  if (btn) {
+    btn.innerText = "Completed ✓";
+    btn.disabled = true;
+    btn.classList.add("opacity-70", "cursor-not-allowed");
+  }
 
-    alert("Application marked as manually completed!");
+  alert("Application marked as manually completed.");
 }
 </script>
-
 
 {% endblock %}

@@ -1,33 +1,172 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="max-w-xl mx-auto bg-white p-8 rounded-xl shadow">
+
+<div class="max-w-3xl mx-auto bg-white p-10 rounded-2xl shadow-md">
 
   {% include "components/progress.html" with context %}
 
-  <h1 class="text-2xl font-bold mb-6">What are your job requirements</h1>
+  <h1 class="text-3xl font-bold mb-8 text-gray-900 text-center">
+    What are your job requirements?
+  </h1>
 
-  <form method="POST" class="space-y-6">
+  <form method="POST" class="space-y-12">
 
+    <!-- SALARY -->
     <div>
-      <label class="block text-gray-700 font-medium mb-1">Minimum salary</label>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Minimum salary</h2>
+      <p class="text-gray-600 text-sm mb-4">Tell us the lowest annual salary you're comfortable with.</p>
+
       <input type="number" name="min_salary"
-        placeholder="Example 45000"
-        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500"
-        required>
+             placeholder="Example: 45000"
+             class="w-full border border-gray-300 rounded-xl px-4 py-3 shadow-sm bg-white
+                    focus:ring-2 focus:ring-blue-500 text-gray-800 transition"
+             required>
     </div>
 
-    <div class="flex items-center space-x-2">
-      <input type="checkbox" name="remote_preference" class="w-4 h-4">
-      <span class="text-gray-700">Open to remote roles</span>
+    <!-- QUESTION 1: LOCAL VS NATIONWIDE -->
+    <div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-3">Where should we look for on-site roles?</h2>
+
+      <div class="space-y-4">
+
+        <!-- LOCAL ONLY -->
+        <label class="block cursor-pointer">
+          <input type="radio" name="location_scope" value="local" class="peer hidden">
+
+          <div class="border border-gray-300 rounded-2xl p-5 shadow-sm bg-white transition
+                      hover:shadow-md hover:border-gray-400
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:ring-2 peer-checked:ring-orange-200">
+
+            <h3 class="text-lg font-semibold text-gray-900">Local roles only</h3>
+            <p class="text-gray-600 text-sm">
+              Show roles within a selected radius from my location.
+            </p>
+          </div>
+        </label>
+
+        <!-- DEFAULT → NATIONWIDE -->
+        <label class="block cursor-pointer">
+          <input type="radio" name="location_scope" value="nationwide" class="peer hidden" checked>
+
+          <div class="border border-gray-300 rounded-2xl p-5 shadow-sm bg-white transition
+                      hover:shadow-md hover:border-gray-400
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:ring-2 peer-checked:ring-orange-200">
+
+            <h3 class="text-lg font-semibold text-gray-900">Nationwide roles</h3>
+            <p class="text-gray-600 text-sm">
+              Show me jobs anywhere within my country.
+            </p>
+
+          </div>
+        </label>
+
+      </div>
     </div>
 
+    <!-- DYNAMIC RADIUS SLIDER -->
+    <div id="radiusContainer" class="hidden mt-4 transition-opacity duration-300">
+      <h3 class="text-lg font-semibold text-gray-900 mb-2">Local radius</h3>
+      <p class="text-gray-600 text-sm mb-3">How far from your city should we search?</p>
+
+      <input id="radiusSlider" name="local_radius" type="range"
+             min="20" max="300" value="20"
+             class="w-full accent-orange-500 cursor-pointer">
+
+      <p class="text-gray-900 font-medium mt-2">
+        <span id="radiusValue">20</span> miles
+      </p>
+    </div>
+
+    <!-- QUESTION 2: REMOTE PREFERENCE -->
+    <div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-3">Remote preference</h2>
+
+      <div class="space-y-4">
+
+        <!-- NO REMOTE -->
+        <label class="block cursor-pointer">
+          <input type="radio" name="remote_preference" value="no_remote" class="peer hidden">
+
+          <div class="border border-gray-300 rounded-2xl p-5 shadow-sm bg-white transition
+                      hover:shadow-md hover:border-gray-400
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:ring-2 peer-checked:ring-orange-200">
+
+            <h3 class="text-lg font-semibold text-gray-900">No remote roles</h3>
+            <p class="text-gray-600 text-sm">Only show on-site or hybrid roles.</p>
+
+          </div>
+        </label>
+
+        <!-- DEFAULT → NATIONAL REMOTE -->
+        <label class="block cursor-pointer">
+          <input type="radio" name="remote_preference" value="remote_national" class="peer hidden" checked>
+
+          <div class="border border-gray-300 rounded-2xl p-5 shadow-sm bg-white transition
+                      hover:shadow-md hover:border-gray-400
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:ring-2 peer-checked:ring-orange-200">
+
+            <h3 class="text-lg font-semibold text-gray-900">Remote (nationwide)</h3>
+            <p class="text-gray-600 text-sm">Show remote jobs available anywhere in my country.</p>
+
+          </div>
+        </label>
+
+        <!-- WORLDWIDE REMOTE -->
+        <label class="block cursor-pointer">
+          <input type="radio" name="remote_preference" value="remote_worldwide" class="peer hidden">
+
+          <div class="border border-gray-300 rounded-2xl p-5 shadow-sm bg-white transition
+                      hover:shadow-md hover:border-gray-400
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:ring-2 peer-checked:ring-orange-200">
+
+            <h3 class="text-lg font-semibold text-gray-900">Remote (worldwide)</h3>
+            <p class="text-gray-600 text-sm">Show remote roles from anywhere globally.</p>
+
+          </div>
+        </label>
+
+      </div>
+    </div>
+
+    <!-- CONTINUE BUTTON -->
     <button
-      class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition">
+      class="w-full bg-blue-600 text-white py-4 rounded-full text-lg font-semibold
+             hover:bg-blue-700 transition shadow-md">
       Continue
     </button>
 
   </form>
 
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    const radiusContainer = document.getElementById("radiusContainer");
+    const radiusSlider = document.getElementById("radiusSlider");
+    const radiusValue = document.getElementById("radiusValue");
+
+    const locationRadios = document.querySelectorAll("input[name='location_scope']");
+
+    function updateRadiusVisibility() {
+        const selected = document.querySelector("input[name='location_scope']:checked").value;
+
+        if (selected === "local") {
+            radiusContainer.classList.remove("hidden");
+        } else {
+            radiusContainer.classList.add("hidden");
+        }
+    }
+
+    locationRadios.forEach(r => r.addEventListener("change", updateRadiusVisibility));
+
+    radiusSlider.addEventListener("input", () => {
+        radiusValue.textContent = radiusSlider.value;
+    });
+
+    updateRadiusVisibility(); // initial state
+});
+</script>
+
 {% endblock %}

@@ -132,7 +132,7 @@ def match_user(conn, user_id: int, limit=200):
             SELECT
                 id AS profile_id, user_id, job_titles, city, state, country,
                 latitude, longitude, remote_preference, min_salary, max_salary,
-                miles_distance, preference_embedding, application_mode
+                miles_distance, preference_embedding, application_mode, worldwide_remote
             FROM profile
             WHERE user_id = %s
         """, (user_id,))
@@ -199,35 +199,57 @@ def match_user(conn, user_id: int, limit=200):
             # -----------------------------
 
             job_country = normalize_country(job["country"])
+            remote_pref = bool(profile.get("remote_preference"))
+            worldwide_remote = bool(profile.get("worldwide_remote"))
 
-            # 1 - country filter (unless remote)
-            if not job["is_remote"] and job_country != profile["country"]:
-                continue
-
-            # 2 - distance filter (except remote)
+            # ------------------------------------------------
+            # NON-REMOTE JOBS
+            # ------------------------------------------------
             if not job["is_remote"]:
+
+                # Must be same country
+                if job_country != profile["country"]:
+                    continue
+
+                # Apply distance limit
                 if max_km:
                     dist = haversine(profile["latitude"], profile["longitude"],
                                      job["latitude"], job["longitude"])
                     if dist is None or dist > max_km:
                         continue
 
-            # 3 - remote preference logic
-            if job["is_remote"] and not profile["remote_preference"]:
-                # Job is remote but user doesn't want remote
-                # Allow only if it is still within local radius
-                job_country = normalize_country(job["country"])
+            # ------------------------------------------------
+            # REMOTE JOBS
+            # ------------------------------------------------
+            else:
 
-                # Must be same country
-                if job_country != profile["country"]:
-                    continue
-                if max_km:
-                    dist = haversine(profile["latitude"], profile["longitude"],
-                                     job["latitude"], job["longitude"])
-                    if dist is None or dist > max_km:
-                        continue  # reject remote + far away
+                # 👉 CASE 1 — User does NOT want remote roles
+                # BUT allow "remote" jobs that have a nearby office
+                if not remote_pref:
+
+                    # Must be same country
+                    if job_country != profile["country"]:
+                        continue
+
+                    # Must be within radius to count as "local-ish"
+                    if max_km:
+                        dist = haversine(profile["latitude"], profile["longitude"],
+                                         job["latitude"], job["longitude"])
+                        if dist is None or dist > max_km:
+                            continue
+                    else:
+                        continue  # No radius defined, reject remote entirely
+
+                # 👉 CASE 2 — User wants remote but ONLY nationwide
+                elif remote_pref and not worldwide_remote:
+
+                    # Must be same country
+                    if job_country != profile["country"]:
+                        continue
+
+                # 👉 CASE 3 — Remote worldwide allowed → accept all remote jobs
                 else:
-                    continue  # no radius defined → reject remote entirely
+                    pass
 
             title_emb = parse_emb(job["title_embedding"])
             desc_emb = parse_emb(job["desc_embedding"])
@@ -257,13 +279,13 @@ def match_user(conn, user_id: int, limit=200):
             remote_penalty = 0.4 if (not profile["remote_preference"] and job["is_remote"]) else 0.0
 
             final_score = (
-                    sem_title * 0.55 +
-                    sem_desc * 0.15 +
-                    kw_score * 0.20 +
-                    sal * 0.10
+                    sem_title * 0.45 +
+                    sem_desc * 0.10 +
+                    kw_score * 0.40 +
+                    sal * 0.05
             )
 
-            # print(f"{job_title_lower} - {final_score} - kw_score: {kw_score},  loc: {loc}, sem_title: {sem_title}, sem_desc: {sem_desc}, sal: {sal}, remote_penalty: {remote_penalty}")
+            #print(f"{job_title_lower} - {final_score} - kw_score: {kw_score},  loc: {loc}, sem_title: {sem_title}, sem_desc: {sem_desc}, sal: {sal}, remote_penalty: {remote_penalty}")
 
             entry = (final_score, next(counter), job)
             if len(heap) < limit:

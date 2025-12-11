@@ -2,166 +2,208 @@
 
 {% block content %}
 
-<div class="max-w-xl mx-auto bg-white p-8 rounded-xl shadow">
+<div class="max-w-3xl mx-auto bg-white p-10 rounded-2xl shadow-md">
 
   {% include "components/progress.html" with context %}
 
-  <h1 class="text-2xl font-bold mb-4">Tell us a few details to help us auto-complete applications</h1>
+  <h1 class="text-3xl font-bold mb-8 text-gray-900 text-center">
+    Tell us a few details to help us auto-complete applications
+  </h1>
 
-  <form method="POST" class="space-y-6">
+  <form method="POST" class="space-y-10">
 
-    <!-- Visa Sponsorship -->
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">
-        Do you require visa sponsorship?
-      </label>
-      <select name="sponsorship_required"
-              class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500">
-        <option value="no">No</option>
-        <option value="yes">Yes</option>
-      </select>
+    <!-- SECTION: WORK AUTHORIZATION -->
+    <div class="space-y-6">
+      <h2 class="text-xl font-semibold text-gray-900">Work eligibility</h2>
+      <p class="text-gray-600 text-sm mb-2">
+        These details help us fill out pre-application questions automatically.
+      </p>
+
+      <!-- Visa Sponsorship -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">
+          Do you require visa sponsorship?
+        </label>
+        <select name="sponsorship_required"
+                class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                       focus:ring-2 focus:ring-blue-500 transition">
+          <option value="no">No</option>
+          <option value="yes">Yes</option>
+        </select>
+      </div>
+
+      <!-- Work Authorization -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">
+          Current work authorization
+        </label>
+        <input type="text"
+               name="work_authorization"
+               placeholder="e.g. UK Citizen, US Green Card, Settled Status"
+               class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                      focus:ring-2 focus:ring-blue-500 transition">
+      </div>
+
+      <!-- Legally allowed -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">
+          Are you legally allowed to work in your target country?
+        </label>
+        <select name="legally_allowed"
+                class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                       focus:ring-2 focus:ring-blue-500 transition">
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+
+      <!-- Notice Period -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">
+          Notice period
+        </label>
+        <input type="text"
+               name="notice_period"
+               placeholder="e.g. Immediate, 2 weeks, 1 month"
+               class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                      focus:ring-2 focus:ring-blue-500 transition">
+      </div>
+
+      <!-- Relocation -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">
+          Are you willing to relocate?
+        </label>
+        <select name="willing_to_relocate"
+                class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                       focus:ring-2 focus:ring-blue-500 transition">
+          <option value="no">No</option>
+          <option value="yes">Yes</option>
+        </select>
+      </div>
+
+      <!-- Work Preference -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">
+          Work preference
+        </label>
+        <select name="location_preference"
+                class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                       focus:ring-2 focus:ring-blue-500 transition">
+          <option value="remote">Remote</option>
+          <option value="hybrid">Hybrid</option>
+          <option value="onsite">Onsite</option>
+        </select>
+      </div>
     </div>
 
-    <!-- Work Authorization -->
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">
-        Current work authorization
-      </label>
-      <input type="text"
-             name="work_authorization"
-             placeholder="e.g. UK Citizen, US Green Card, Settled Status"
-             class="w-full border border-gray-300 rounded-lg px-4 py-2">
+
+    <!-- SECTION: EXPERIENCE + SALARY -->
+    <div class="space-y-6">
+      <h2 class="text-xl font-semibold text-gray-900">Experience & salary</h2>
+
+      <!-- Salary -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">
+          Desired salary range
+        </label>
+        <input type="text"
+               name="desired_salary"
+               placeholder="e.g. 45k–60k"
+               class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                      focus:ring-2 focus:ring-blue-500 transition">
+      </div>
+
+      <!-- Years of Experience -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">
+          Years of experience
+        </label>
+        <input type="number"
+               name="years_experience"
+               min="0"
+               class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                      focus:ring-2 focus:ring-blue-500 transition">
+      </div>
+
+      <!-- Education -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">
+          Highest completed education
+        </label>
+        <input type="text"
+               name="highest_education"
+               placeholder="e.g. BSc Computer Science"
+               class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                      focus:ring-2 focus:ring-blue-500 transition">
+      </div>
     </div>
 
-    <!-- Legally allowed to work -->
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">
-        Are you legally allowed to work in your target country?
-      </label>
-      <select name="legally_allowed"
-              class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500">
-        <option value="yes">Yes</option>
-        <option value="no">No</option>
-      </select>
+
+    <!-- SECTION: OPTIONAL DIVERSITY -->
+    <div class="space-y-6">
+      <h2 class="text-xl font-semibold text-gray-900">Optional diversity information</h2>
+      <p class="text-gray-600 text-sm mb-2">
+        These help us auto-fill Equal Opportunity questions when required.
+      </p>
+
+      <!-- Gender -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">Gender</label>
+        <select name="gender"
+                class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                       focus:ring-2 focus:ring-blue-500 transition">
+          <option value="">Prefer not to say</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Non-binary">Non-binary</option>
+        </select>
+      </div>
+
+      <!-- Race -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">Race / Ethnicity</label>
+        <select name="race"
+                class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                       focus:ring-2 focus:ring-blue-500 transition">
+          <option value="">Prefer not to say</option>
+          <option value="White">White</option>
+          <option value="Black">Black</option>
+          <option value="Asian">Asian</option>
+          <option value="Mixed">Mixed</option>
+          <option value="Hispanic">Hispanic</option>
+        </select>
+      </div>
+
+      <!-- Veteran -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">Veteran status</label>
+        <select name="veteran_status"
+                class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                       focus:ring-2 focus:ring-blue-500 transition">
+          <option value="">Prefer not to say</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+
+      <!-- Disability -->
+      <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 shadow-sm">
+        <label class="block text-gray-700 font-medium mb-2">Disability status</label>
+        <select name="disability_status"
+                class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white
+                       focus:ring-2 focus:ring-blue-500 transition">
+          <option value="">Prefer not to say</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
     </div>
 
-    <!-- Notice Period -->
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">
-        Notice period
-      </label>
-      <input type="text"
-             name="notice_period"
-             placeholder="e.g. Immediate, 2 weeks, 1 month"
-             class="w-full border border-gray-300 rounded-lg px-4 py-2">
-    </div>
-
-    <!-- Relocation -->
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">
-        Are you willing to relocate?
-      </label>
-      <select name="willing_to_relocate"
-              class="w-full border border-gray-300 rounded-lg px-4 py-2">
-        <option value="no">No</option>
-        <option value="yes">Yes</option>
-      </select>
-    </div>
-
-    <!-- Work Preference -->
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">
-        Work preference
-      </label>
-      <select name="location_preference"
-              class="w-full border border-gray-300 rounded-lg px-4 py-2">
-        <option value="remote">Remote</option>
-        <option value="hybrid">Hybrid</option>
-        <option value="onsite">Onsite</option>
-      </select>
-    </div>
-
-    <!-- Salary -->
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">
-        Desired salary range
-      </label>
-      <input type="text"
-             name="desired_salary"
-             placeholder="e.g. 45k–60k"
-             class="w-full border border-gray-300 rounded-lg px-4 py-2">
-    </div>
-
-    <!-- Experience -->
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">
-        Years of experience
-      </label>
-      <input type="number"
-             name="years_experience"
-             min="0"
-             class="w-full border border-gray-300 rounded-lg px-4 py-2">
-    </div>
-
-    <!-- Education -->
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">
-        Highest completed education
-      </label>
-      <input type="text"
-             name="highest_education"
-             placeholder="e.g. BSc Computer Science"
-             class="w-full border border-gray-300 rounded-lg px-4 py-2">
-    </div>
-
-    <!-- Diversity (optional) -->
-    <h2 class="text-xl font-semibold text-gray-900 mt-8">Optional diversity information</h2>
-    <p class="text-gray-600 text-sm mb-4">
-      These help us auto-fill Equal Opportunity questions when required.
-    </p>
-
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">Gender</label>
-      <select name="gender" class="w-full border border-gray-300 rounded-lg px-4 py-2">
-        <option value="">Prefer not to say</option>
-        <option value="Male">Male</option>
-        <option value="Female">Female</option>
-        <option value="Non-binary">Non-binary</option>
-      </select>
-    </div>
-
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">Race / Ethnicity</label>
-      <select name="race" class="w-full border border-gray-300 rounded-lg px-4 py-2">
-        <option value="">Prefer not to say</option>
-        <option value="White">White</option>
-        <option value="Black">Black</option>
-        <option value="Asian">Asian</option>
-        <option value="Mixed">Mixed</option>
-        <option value="Hispanic">Hispanic</option>
-      </select>
-    </div>
-
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">Veteran status</label>
-      <select name="veteran_status" class="w-full border border-gray-300 rounded-lg px-4 py-2">
-        <option value="">Prefer not to say</option>
-        <option value="Yes">Yes</option>
-        <option value="No">No</option>
-      </select>
-    </div>
-
-    <div>
-      <label class="block text-gray-700 font-medium mb-2">Disability status</label>
-      <select name="disability_status" class="w-full border border-gray-300 rounded-lg px-4 py-2">
-        <option value="">Prefer not to say</option>
-        <option value="Yes">Yes</option>
-        <option value="No">No</option>
-      </select>
-    </div>
-
+    <!-- SUBMIT BUTTON -->
     <button
-      class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition">
+      class="w-full bg-blue-600 text-white py-4 rounded-full text-lg font-semibold
+             hover:bg-blue-700 transition shadow-md">
       Continue to dashboard
     </button>
 

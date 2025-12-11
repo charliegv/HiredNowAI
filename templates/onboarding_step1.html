@@ -1,91 +1,106 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="max-w-xl mx-auto bg-white p-8 rounded-xl shadow">
+
+<div class="max-w-3xl mx-auto bg-white p-10 rounded-2xl shadow-md">
 
   {% include "components/progress.html" with context %}
 
-  <h1 class="text-2xl font-bold mb-6">Tell us what kind of job you want</h1>
+  <h1 class="text-3xl font-bold mb-8 text-gray-900 text-center">
+    Tell us what kind of job you want
+  </h1>
 
-  <form method="POST" class="space-y-6">
+  <form method="POST" class="space-y-10">
 
+    <!-- Desired Roles -->
     <div>
-      <label class="block text-gray-700 font-medium mb-1">Desired Roles</label>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Desired roles</h2>
+      <p class="text-gray-600 text-sm mb-4">
+        Tell us which types of roles you want us to find for you.
+      </p>
+
       <input type="text" name="job_titles"
-        placeholder="Example Software Engineer, Product Manager"
-        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500"
-        required>
+             placeholder="Example: Software Engineer, Product Manager"
+             class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white shadow-sm
+                    text-gray-800 transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+             required>
     </div>
 
+    <!-- Country -->
+    <div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Where do you want to work?</h2>
 
+      <label class="block text-gray-700 font-medium mb-2">Country</label>
 
+      <select name="country"
+              class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white shadow-sm
+                     focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
+              required>
+        <option value="">Select your country</option>
+        <option value="United Kingdom">United Kingdom</option>
+        <option value="United States">United States</option>
+      </select>
+    </div>
 
-<label class="block text-gray-700 font-medium mb-2">
-  Country
-</label>
-<select name="country"
-        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring focus:ring-blue-500"
-        required>
-    <option value="">Select your country</option>
-    <option value="United Kingdom">United Kingdom</option>
-    <option value="United States">United States</option>
-</select>
-
-
-      <label class="block text-gray-700 font-medium mt-4 mb-2">
-  City
-</label>
+    <!-- City -->
+    <div>
+      <label class="block text-gray-700 font-medium mb-2">City</label>
 
       <div class="relative">
-    <input
-        type="text"
-        id="cityInput"
-        name="city"
-        placeholder="Start typing your city..."
-        autocomplete="off"
-        class="w-full border border-gray-300 rounded-lg px-4 py-2"
-        required
-    />
 
-    <!-- Suggestions dropdown -->
-    <ul
-        id="citySuggestions"
-        class="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow hidden max-h-60 overflow-y-auto"
-    ></ul>
-</div>
+        <input
+          type="text"
+          id="cityInput"
+          name="city"
+          placeholder="Start typing your city..."
+          autocomplete="off"
+          class="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white shadow-sm
+                 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+          required
+        />
 
+        <!-- Suggestions dropdown -->
+        <ul
+          id="citySuggestions"
+          class="absolute z-50 w-full bg-white border border-gray-200 rounded-xl shadow-md hidden max-h-60 overflow-y-auto mt-1"
+        ></ul>
 
+      </div>
+
+      <p class="text-gray-500 text-sm mt-2">
+        We’ll use this to personalise your job matches.
+      </p>
+    </div>
+
+    <!-- Continue button -->
     <button
-      class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition">
+      class="w-full bg-blue-600 text-white py-4 rounded-full text-lg font-semibold
+             hover:bg-blue-700 transition shadow-md">
       Continue
     </button>
 
   </form>
 
 
-    <script>
+<script>
 document.addEventListener("DOMContentLoaded", () => {
+
     const input = document.getElementById("cityInput");
     const suggestionsBox = document.getElementById("citySuggestions");
     const countrySelect = document.querySelector("select[name='country']");
-
     let debounceTimer = null;
 
     async function searchCities(query, country) {
         if (!query || query.length < 2) return [];
-
-        const url = `https://nominatim.openstreetmap.org/search?` +
-            new URLSearchParams({
-                q: `${query}, ${country}`,
-                format: "json",
-                addressdetails: 1,
-                limit: 5
-            });
+        const url = "https://nominatim.openstreetmap.org/search?" + new URLSearchParams({
+            q: `${query}, ${country}`,
+            format: "json",
+            addressdetails: 1,
+            limit: 5
+        });
 
         const res = await fetch(url, {
-            headers: {
-                "User-Agent": "HiredNowAI/1.0"
-            }
+            headers: { "User-Agent": "HiredNowAI/1.0" }
         });
 
         return res.json();
@@ -105,39 +120,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const results = await searchCities(query, country);
 
+            suggestionsBox.innerHTML = "";
+            suggestionsBox.classList.remove("hidden");
+
             if (results.length === 0) {
                 suggestionsBox.innerHTML =
-                    `<li class="px-4 py-2 text-gray-500">No matches found</li>`;
-                suggestionsBox.classList.remove("hidden");
+                    `<li class="px-4 py-3 text-gray-500">No matches found</li>`;
                 return;
             }
 
-            suggestionsBox.innerHTML = "";
-
             results.forEach(item => {
-                const name = item.display_name;
+                const raw = item.address;
+                const name = raw.city || raw.town || raw.village || raw.hamlet || item.display_name.split(",")[0];
+
                 const li = document.createElement("li");
-                li.className = "px-4 py-2 hover:bg-gray-100 cursor-pointer";
+                li.className = "px-4 py-3 hover:bg-gray-100 cursor-pointer transition";
                 li.textContent = name;
 
                 li.addEventListener("click", () => {
-                    input.value = item.address.city
-                               || item.address.town
-                               || item.address.village
-                               || item.address.hamlet
-                               || name.split(",")[0];
-
+                    input.value = name;
                     suggestionsBox.classList.add("hidden");
                 });
 
                 suggestionsBox.appendChild(li);
             });
 
-            suggestionsBox.classList.remove("hidden");
         }, 300);
     });
 
-    // Hide suggestions when clicking outside
+    // Hide when clicking outside
     document.addEventListener("click", (e) => {
         if (!e.target.closest("#citySuggestions") && e.target !== input) {
             suggestionsBox.classList.add("hidden");
@@ -146,6 +157,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 
-
 </div>
+
 {% endblock %}

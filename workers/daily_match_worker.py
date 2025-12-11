@@ -23,7 +23,7 @@ def get_connection():
 
 def get_all_user_ids(conn):
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute("SELECT user_id FROM profile WHERE onboarding_complete = true and is_active = true")
+        cur.execute("SELECT user_id FROM profile WHERE onboarding_complete = true and is_active = true and user_id = 69")
         rows = cur.fetchall()
         return [r["user_id"] for r in rows]
 
