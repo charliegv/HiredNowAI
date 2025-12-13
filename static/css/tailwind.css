@@ -861,6 +861,10 @@ video {
   max-width: 36rem;
 }
 
+.max-w-7xl {
+  max-width: 80rem;
+}
+
 .flex-grow {
   flex-grow: 1;
 }
@@ -1416,6 +1420,11 @@ video {
   color: rgb(161 98 7 / var(--tw-text-opacity, 1));
 }
 
+.text-gray-400 {
+  --tw-text-opacity: 1;
+  color: rgb(156 163 175 / var(--tw-text-opacity, 1));
+}
+
 .underline {
   text-decoration-line: underline;
 }
@@ -1617,6 +1626,10 @@ video {
 
   .md\:grid-cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .md\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .md\:flex-row {

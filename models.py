@@ -33,9 +33,11 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
 
     # Relationship: one user → one profile
     profile = db.relationship("Profile", backref="user", uselist=False, cascade="all, delete")
+
 
 
 class Profile(db.Model):

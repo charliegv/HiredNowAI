@@ -16,6 +16,8 @@ MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
 auth = Blueprint('auth', __name__)
 bcrypt = Bcrypt()
 
+
+
 @auth.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
@@ -150,6 +152,4 @@ def reset_password(token):
             return redirect(url_for("auth.login"))
 
     return render_template("reset_password.html", token=token)
-
-
 

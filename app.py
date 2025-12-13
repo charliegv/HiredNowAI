@@ -24,12 +24,21 @@ def create_app():
     def load_user(user_id):
         return User.query.get(int(user_id))
 
+    # -----------------------------
+    # REGISTER BLUEPRINTS
+    # -----------------------------
+
     app.register_blueprint(auth)
     app.register_blueprint(dashboard)
     app.register_blueprint(preferences)
     app.register_blueprint(onboarding)
 
+    # >>> ADD THIS PART <<<
+    from admin.routes import admin_bp
+    app.register_blueprint(admin_bp, url_prefix="/admin")
+
     return app
+
 
 app = create_app()
 

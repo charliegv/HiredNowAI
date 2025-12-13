@@ -1,0 +1,169 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+{% macro sort_link(label, column) %}
+  {% set new_dir = "asc" if sort != column or direction == "desc" else "desc" %}
+  <a href="?sort={{ column }}&dir={{ new_dir }}&page={{ page }}"
+     class="hover:underline flex items-center gap-1">
+    {{ label }}
+    {% if sort == column %}
+      <span class="text-xs">
+        {{ "▲" if direction == "asc" else "▼" }}
+      </span>
+    {% endif %}
+  </a>
+{% endmacro %}
+
+<div class="max-w-7xl mx-auto py-8">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <h1 class="text-3xl font-semibold text-gray-900">Admin Dashboard</h1>
+    <p class="text-gray-600 mt-1">System overview and user access</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+
+    <div class="bg-white p-6 rounded-xl shadow-sm border">
+      <p class="text-sm text-gray-500">Total users</p>
+      <p class="text-3xl font-bold text-gray-900">{{ stats.users }}</p>
+    </div>
+
+    <div class="bg-white p-6 rounded-xl shadow-sm border">
+      <p class="text-sm text-gray-500">Applications sent</p>
+      <p class="text-3xl font-bold text-gray-900">{{ stats.applications }}</p>
+    </div>
+
+    <div class="bg-white p-6 rounded-xl shadow-sm border">
+      <p class="text-sm text-gray-500">Active automation</p>
+      <p class="text-3xl font-bold text-green-600">{{ stats.active_users }}</p>
+    </div>
+
+    <div class="bg-white p-6 rounded-xl shadow-sm border">
+      <p class="text-sm text-gray-500">Errors today</p>
+      <p class="text-3xl font-bold text-red-600">{{ stats.errors_today or 0 }}</p>
+    </div>
+
+  </div>
+
+  <!-- Users table -->
+  <div class="bg-white rounded-xl shadow-sm border">
+
+    <div class="px-6 py-4 border-b">
+      <h2 class="text-xl font-semibold text-gray-900">Users</h2>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+
+        <thead>
+          <tr class="text-sm text-gray-600 border-b">
+            <th class="px-6 py-3">{{ sort_link("ID", "id") }}</th>
+            <th class="px-6 py-3">Name</th>
+            <th class="px-6 py-3">{{ sort_link("Email", "email") }}</th>
+            <th class="px-6 py-3">{{ sort_link("Country", "country") }}</th>
+            <th class="px-6 py-3">{{ sort_link("Created", "created_at") }}</th>
+            <th class="px-6 py-3">Mode</th>
+            <th class="px-6 py-3">{{ sort_link("Applications", "applications") }}</th>
+            <th class="px-6 py-3">{{ sort_link("Last Application", "last_application") }}</th>
+            <th class="px-6 py-3">Admin</th>
+            <th class="px-6 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for user, application_count, last_application in users %}
+          <tr class="border-b hover:bg-gray-50">
+
+            <td class="px-6 py-3 text-sm text-gray-600">{{ user.id }}</td>
+
+            <td class="px-6 py-3 font-medium text-gray-900">
+              {{ user.profile.first_name or "-" }} {{ user.profile.last_name or "" }}
+            </td>
+
+            <td class="px-6 py-3 text-gray-700">{{ user.email }}</td>
+
+            <td class="px-6 py-3 text-gray-600 text-sm">
+              {{ user.profile.country or "-" }}
+            </td>
+
+            <td class="px-6 py-3 text-sm text-gray-600">
+              {{ user.created_at.strftime("%d %b %Y") }}
+            </td>
+
+            <td class="px-6 py-3 text-sm">
+              {% if user.profile.application_mode == "auto" %}
+                <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">Auto</span>
+              {% else %}
+                <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">Manual</span>
+              {% endif %}
+            </td>
+
+            <td class="px-6 py-3 text-sm font-semibold">{{ application_count }}</td>
+
+            <td class="px-6 py-3 text-sm text-gray-600">
+              {% if last_application %}
+                {{ last_application.strftime("%d %b %Y") }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+
+            <td class="px-6 py-3 text-sm">
+              {% if user.is_admin %}
+                <span class="text-green-600 font-semibold">Yes</span>
+              {% else %}
+                <span class="text-gray-400">No</span>
+              {% endif %}
+            </td>
+
+            <td class="px-6 py-3 text-right">
+              {% if not user.is_admin %}
+                <a href="{{ url_for('admin.impersonate', user_id=user.id) }}"
+                   class="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                  Log in as user
+                </a>
+              {% else %}
+                <span class="text-gray-400 text-sm">—</span>
+              {% endif %}
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="px-6 py-4 flex justify-between items-center border-t text-sm">
+
+      <div class="text-gray-600">
+        Page {{ page }} of {{ total_pages }}
+      </div>
+
+      <div class="flex gap-2">
+        {% if page > 1 %}
+          <a href="?page={{ page - 1 }}&sort={{ sort }}&dir={{ direction }}"
+             class="px-3 py-1 border rounded hover:bg-gray-100">
+            Previous
+          </a>
+        {% endif %}
+
+        {% if page < total_pages %}
+          <a href="?page={{ page + 1 }}&sort={{ sort }}&dir={{ direction }}"
+             class="px-3 py-1 border rounded hover:bg-gray-100">
+            Next
+          </a>
+        {% endif %}
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
