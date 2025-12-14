@@ -6,6 +6,23 @@
 
   <!-- HEADER AND MODE CHIPS -->
   <div class="mb-6">
+      {% if session.admin_id %}
+  <div class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 flex flex-wrap items-center justify-between gap-4">
+
+    <div class="text-sm text-red-700 font-medium">
+      You are currently impersonating this user.
+    </div>
+
+    <a href="{{ url_for('admin.stop_impersonation') }}"
+       class="inline-flex items-center gap-2 px-4 py-2 rounded-lg
+              bg-red-600 text-white text-sm font-semibold
+              hover:bg-red-700 transition shadow">
+      Exit admin impersonation
+    </a>
+
+  </div>
+{% endif %}
+
     <h1 class="text-3xl font-semibold text-gray-900 flex flex-wrap items-center gap-3">
       Welcome back, {{ current_user.profile.first_name or current_user.email }}
 
