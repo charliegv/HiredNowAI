@@ -44,17 +44,27 @@ async def get_db():
 
 CLAIM_QUERY = """
 WITH next_task AS (
-    SELECT id
-    FROM applications
-    WHERE status = 'pending'
+    SELECT a.id
+    FROM applications a
+    JOIN credit_balance cb
+      ON cb.user_id = a.user_id
+    JOIN profile p
+      ON p.user_id = a.user_id
+    WHERE a.status = 'pending'
+      AND a.credit_consumed = FALSE
+      AND cb.available_credits > 0
+      AND p.is_active = TRUE
     ORDER BY RANDOM()
     LIMIT 1
     FOR UPDATE SKIP LOCKED
 )
 UPDATE applications
-SET status = 'processing', updated_at = now()
+SET status = 'processing',
+    updated_at = now()
 WHERE id = (SELECT id FROM next_task)
 RETURNING id, user_id, job_id;
+
+
 """
 
 
@@ -64,6 +74,101 @@ async def load_job(pool, job_id):
 
 async def load_user_profile(pool, user_id):
     return await pool.fetchrow("SELECT * FROM profile WHERE user_id = $1", user_id)
+
+class InsufficientCredits(Exception):
+    pass
+
+async def deactivate_user(pool, user_id: int, reason: str):
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            UPDATE profile
+            SET
+                is_active = FALSE,
+                deactivate_reason = $2,
+                updated_at = now()
+            WHERE user_id = $1
+            """,
+            user_id,
+            reason
+        )
+
+async def consume_credit(pool, user_id: int, app_id: int):
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+
+            # Lock application row
+            app = await conn.fetchrow(
+                """
+                SELECT credit_consumed
+                FROM applications
+                WHERE id = $1
+                FOR UPDATE
+                """,
+                app_id
+            )
+
+            if not app:
+                raise Exception("Application not found")
+
+            if app["credit_consumed"]:
+                # Idempotent safe exit
+                return False
+
+            # Lock credit balance row
+            balance = await conn.fetchrow(
+                """
+                SELECT available_credits
+                FROM credit_balance
+                WHERE user_id = $1
+                FOR UPDATE
+                """,
+                user_id
+            )
+
+            if not balance or balance["available_credits"] <= 0:
+                raise InsufficientCredits()
+
+            # Ledger entry
+            await conn.execute(
+                """
+                INSERT INTO credit_ledger (
+                    user_id,
+                    change_amount,
+                    reason,
+                    reference_id
+                )
+                VALUES ($1, -1, 'application_success', $2)
+                """,
+                user_id,
+                str(app_id)
+            )
+
+            # Update balance
+            await conn.execute(
+                """
+                UPDATE credit_balance
+                SET
+                    available_credits = available_credits - 1,
+                    lifetime_spent = lifetime_spent + 1,
+                    updated_at = now()
+                WHERE user_id = $1
+                """,
+                user_id
+            )
+
+            # Mark application
+            await conn.execute(
+                """
+                UPDATE applications
+                SET credit_consumed = TRUE
+                WHERE id = $1
+                """,
+                app_id
+            )
+
+            return True
+
 
 
 def get_bot(ats_type):
@@ -95,13 +200,25 @@ async def download_cv_to_tmp(cv_url: str, custom_cv_name) -> str:
 
 
 
-async def mark_success(pool, app_id):
+async def mark_success(pool, app_id, user_id):
     async with pool.acquire() as conn:
-        await conn.execute("""
+        await conn.execute(
+            """
             UPDATE applications
-            SET status = 'success', updated_at = now()
+            SET status = 'success',
+                updated_at = now()
             WHERE id = $1
-        """, app_id)
+            """,
+            app_id
+        )
+
+    # Consume credit AFTER success
+    try:
+        await consume_credit(pool, user_id, app_id)
+    except InsufficientCredits:
+        logging.warning(f"[Worker] User {user_id} credits exhausted, pausing automation")
+        await deactivate_user(pool, user_id, "credits_exhausted")
+
 
 
 async def mark_failed(pool, app_id, error_msg):
@@ -244,6 +361,7 @@ async def worker_loop():
                             updated_at = now()
                         WHERE id = $3
                     """, cv_url, json.dumps(cv_json), app_id)
+                    await consume_credit(pool, user_id, app_id)
 
                     continue  # Go to next job without applying
 
@@ -273,7 +391,7 @@ async def worker_loop():
                         """, result.screenshot_url, app_id)
 
                 if result.status == "success":
-                    await mark_success(pool, app_id)
+                    await mark_success(pool, app_id, user_id)
 
                 elif result.status == "retry":
                     await mark_retry(pool, app_id, result.message)

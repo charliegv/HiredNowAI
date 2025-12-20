@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
-from models import db, Profile
+from models import db, Profile, SubscriptionPlan
 from werkzeug.utils import secure_filename
 from utils.cv_parser import extract_cv_text
 from utils.cv_ai import parse_cv_with_ai
@@ -10,6 +10,8 @@ import psycopg2
 import os
 from utils.s3_uploader import upload_to_s3
 from utils.background import run_async
+from utils.credits import init_credit_balance
+from utils.onboarding import resume_onboarding
 
 onboarding = Blueprint("onboarding", __name__)
 
@@ -21,13 +23,15 @@ def require_onboarding_complete(view):
         if not current_user.is_authenticated:
             return redirect(url_for("auth.login"))
 
-        # If profile exists but onboarding is not done
-        if not current_user.profile.onboarding_complete:
-            return redirect(url_for("onboarding.step1"))
+        profile = current_user.profile
+        if not profile.onboarding_complete:
+            return resume_onboarding(profile)
 
         return view(*args, **kwargs)
+
     wrapper.__name__ = view.__name__
     return wrapper
+
 
 
 # =========================================================
@@ -63,11 +67,12 @@ def step1():
 
         profile.latitude = lat
         profile.longitude = lon
+        profile.onboarding_step = 2
 
         db.session.commit()
         return redirect(url_for("onboarding.step2"))
 
-    return render_template("onboarding_step1.html", step=1, progress=25)
+    return render_template("onboarding_step1.html", step=1, progress=20)
 
 
 
@@ -118,6 +123,7 @@ def step2():
             profile.remote_preference = True
             profile.worldwide_remote = True
 
+        profile.onboarding_step = 3
         db.session.commit()
 
         # -----------------------------
@@ -138,7 +144,7 @@ def step2():
         return redirect(url_for("onboarding.step3"))
 
     # GET request
-    return render_template("onboarding_step2.html", step=2, progress=50)
+    return render_template("onboarding_step2.html", step=2, progress=40)
 
 
 # =========================================================
@@ -186,12 +192,26 @@ def step3():
                 pass
 
         # Mark onboarding complete
-        profile.onboarding_complete = True
+        profile.onboarding_step = 4
         db.session.commit()
+
+
+        try:
+            conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+            init_credit_balance(
+                conn=conn,
+                user_id=current_user.id,
+                initial_credits=5,
+                reason="trial_grant",
+                reference_id="onboarding"
+            )
+            conn.close()
+        except Exception as e:
+            print("Failed to initialise credits:", e)
 
         return redirect(url_for("onboarding.step4"))
 
-    return render_template("onboarding_step3.html", profile=profile, step=3, progress=75)
+    return render_template("onboarding_step3.html", profile=profile, step=3, progress=60)
 
 
 @onboarding.route("/onboarding/step4", methods=["GET", "POST"])
@@ -220,12 +240,13 @@ def step4():
 
         profile.application_data = application_data
         profile.onboarding_application_complete = True
+        profile.onboarding_step = 5
         db.session.commit()
 
         # Redirect to success dashboard or next step
-        return redirect(url_for("onboarding.edit_cv"))
+        return redirect(url_for("onboarding.onboarding_plan"))
 
-    return render_template("onboarding_step4.html", profile=profile, step=4, progress=100)
+    return render_template("onboarding_step4.html", profile=profile, step=4, progress=80)
 
 
 
@@ -235,7 +256,11 @@ def step4():
 @onboarding.route("/cv/preview")
 @login_required
 def cv_preview():
+
     profile = get_or_create_profile()
+    if not profile.onboarding_complete:
+        profile.onboarding_complete = True
+        db.session.commit()
     return render_template("cv_preview.html", cv=profile.ai_cv_data, profile=profile)
 
 
@@ -247,6 +272,9 @@ def cv_preview():
 @login_required
 def edit_cv():
     profile = get_or_create_profile()
+    if not profile.onboarding_complete:
+        profile.onboarding_step = 6
+        db.session.commit()
 
     if request.method == "POST":
 
@@ -324,6 +352,7 @@ def edit_cv():
                 })
 
         profile.ai_cv_data = updated_data
+        profile.onboarding_complete = True
         db.session.commit()
 
         return redirect(url_for("onboarding.cv_preview"))
@@ -359,3 +388,22 @@ def edit_cv():
     safe_cv = ensure_keys(profile.ai_cv_data)
 
     return render_template("cv_edit.html", cv=safe_cv, profile=profile)
+
+
+@onboarding.route("/onboarding/plan")
+@login_required
+def onboarding_plan():
+    plans = SubscriptionPlan.query.filter_by(active=True).all()
+
+    plans_by_currency = {
+        "GBP": [p for p in plans if p.currency == "gbp"],
+        "USD": [p for p in plans if p.currency == "usd"],
+    }
+
+    return render_template(
+        "onboarding_plan.html",
+        plans_by_currency=plans_by_currency,
+        step=5,
+        progress=100,
+    )
+

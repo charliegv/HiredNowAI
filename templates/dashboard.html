@@ -23,6 +23,40 @@
   </div>
 {% endif %}
 
+      {% if not profile.is_active %}
+<div class="mb-8 rounded-xl border border-red-200 bg-red-50 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+
+  <div>
+    <p class="text-sm font-semibold text-red-700">
+      Your account is currently on hold
+    </p>
+    <p class="text-sm text-red-600 mt-1">
+      Reason:
+      {% if profile.deactivate_reason == "credits_exhausted" %}
+        You have used all of your available credits.
+      {% elif profile.deactivate_reason == "payment_failed" %}
+        Your last payment failed.
+      {% elif profile.deactivate_reason == "user_paused" %}
+        You paused automation manually.
+      {% elif profile.deactivate_reason == "admin_paused" %}
+        Automation was paused by an administrator.
+      {% else %}
+        Automation is temporarily unavailable.
+      {% endif %}
+    </p>
+  </div>
+
+  <a href="{{ url_for('preferences.preferences_page') }}"
+     class="inline-flex items-center justify-center px-5 py-2 rounded-lg
+            bg-red-600 text-white text-sm font-semibold
+            hover:bg-red-700 transition shadow">
+    Resolve
+  </a>
+
+</div>
+{% endif %}
+
+
     <h1 class="text-3xl font-semibold text-gray-900 flex flex-wrap items-center gap-3">
       Welcome back, {{ current_user.profile.first_name or current_user.email }}
 
@@ -99,9 +133,6 @@
     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
       <p class="text-gray-600 text-sm mb-1">Applications sent</p>
       <p class="text-3xl font-bold text-gray-900">{{ stats.applications_sent }}</p>
-      <p class="text-sm text-green-600 mt-1">
-        Automation running {{ profile.application_frequency }}
-      </p>
     </div>
 
     <!-- Matching jobs -->
@@ -110,6 +141,32 @@
       <p class="text-3xl font-bold text-gray-900">{{ stats.match_count }}</p>
       <p class="text-sm text-gray-500 mt-1">Based on your preferences</p>
     </div>
+
+      <!-- Credits remaining -->
+<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+  <p class="text-gray-600 text-sm mb-1">Credits remaining</p>
+
+  <p class="text-3xl font-bold
+     {% if available_credits > 0 %}
+       text-gray-900
+     {% else %}
+       text-red-600
+     {% endif %}
+  ">
+    {{ available_credits }}
+  </p>
+
+  {% if available_credits > 0 %}
+    <p class="text-sm text-green-600 mt-1">
+      Ready to apply
+    </p>
+  {% else %}
+    <p class="text-sm text-red-600 mt-1">
+      Automation paused
+    </p>
+  {% endif %}
+</div>
+
 
   </div>
 
@@ -680,10 +737,10 @@
         {% if automation_running %} bg-green-500 {% else %} bg-red-500 {% endif %}">
       </span>
       <span class="text-sm text-gray-700">
-        {% if automation_running %}
+        {% if profile.is_active %}
           Active
         {% else %}
-          Paused (Approval Mode)
+          Paused
         {% endif %}
       </span>
     </div>

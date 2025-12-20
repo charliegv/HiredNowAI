@@ -8,6 +8,7 @@ from profile import preferences
 from flask_login import LoginManager
 
 
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -35,6 +36,9 @@ def create_app():
 
     # >>> ADD THIS PART <<<
     from admin.routes import admin_bp
+    from billing import billing_bp
+
+    app.register_blueprint(billing_bp, url_prefix="/billing")
     app.register_blueprint(admin_bp, url_prefix="/admin")
 
     return app

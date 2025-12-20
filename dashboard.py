@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, send_file, redirect, jsonify
 from flask_login import login_required, current_user
-from models import db, Profile, PendingApplication, Application, Match, Job
+from models import db, Profile, PendingApplication, Application, Match, Job, CreditBalance
+
 from datetime import datetime
 from sqlalchemy import desc
 import hashlib
@@ -18,6 +19,12 @@ dashboard = Blueprint('dashboard', __name__)
 def dashboard_home():
 
     profile = current_user.profile
+
+    credit_balance = CreditBalance.query.filter_by(
+	    user_id=current_user.id
+    ).first()
+
+    available_credits = credit_balance.available_credits if credit_balance else 0
 
     # Fetch recent applications
     activity = Application.query \
@@ -76,7 +83,8 @@ def dashboard_home():
         automation_running=automation_running,
         activity=activity,
         matches=matches,
-	    manual_required=manual_required
+	    manual_required=manual_required,
+	    available_credits=available_credits,
     )
 
 @dashboard.route("/application/<int:app_id>/manual-complete", methods=["POST"])

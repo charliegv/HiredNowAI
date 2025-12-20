@@ -88,6 +88,9 @@ class Profile(db.Model):
     onboarding_complete = db.Column(db.Boolean, default=False)
     application_mode = db.Column(db.String, default="auto")
     match_mode = db.Column(db.String, default="standard")
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    deactivate_reason = db.Column(db.String(50))
+    onboarding_step = db.Column(db.Integer, default=1, nullable=False)
 
 class PendingApplication(db.Model):
     __tablename__ = "pending_applications"
@@ -158,6 +161,7 @@ class Application(db.Model):
     # convenience relationship
     user = db.relationship("User", backref="applications")
     manual_started = db.Column(db.Boolean, default=False)
+    credit_consumed = db.Column(db.Boolean, default=False, nullable=False)
 
     # prevent duplicates for a user+job
     __table_args__ = (
@@ -211,6 +215,144 @@ class Match(db.Model):
         db.UniqueConstraint("user_id", "job_url", name="unique_user_job"),
     )
 
+class CreditBalance(db.Model):
+    __tablename__ = "credit_balance"
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", ondelete="CASCADE"),
+        primary_key=True
+    )
+
+    available_credits = db.Column(db.Integer, nullable=False, default=0)
+    lifetime_granted = db.Column(db.Integer, nullable=False, default=0)
+    lifetime_spent = db.Column(db.Integer, nullable=False, default=0)
+
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
+    user = db.relationship("User", backref=db.backref("credit_balance", uselist=False))
+
+class CreditLedger(db.Model):
+    __tablename__ = "credit_ledger"
+
+    id = db.Column(db.BigInteger, primary_key=True)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    change_amount = db.Column(db.Integer, nullable=False)
+    reason = db.Column(db.String(50), nullable=False)
+    reference_id = db.Column(db.String(255))
+
+    created_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+
+    user = db.relationship("User", backref="credit_ledger_entries")
 
 
+class SubscriptionPlan(db.Model):
+    __tablename__ = "subscription_plans"
 
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    stripe_price_id = db.Column(db.String(255), unique=True, nullable=False)
+
+    credits_per_period = db.Column(db.Integer, nullable=False)
+    billing_interval = db.Column(db.String(20), nullable=False)
+
+    active = db.Column(db.Boolean, default=True, nullable=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    currency = db.Column(db.Text, nullable=False)
+
+    price_amount = db.Column(db.Integer, nullable=False)
+
+class UserSubscription(db.Model):
+    __tablename__ = "user_subscriptions"
+
+    id = db.Column(db.BigInteger, primary_key=True)
+
+    user_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    plan_id = db.Column(
+        db.Integer,
+        db.ForeignKey("subscription_plans.id"),
+        nullable=False,
+        index=True,
+    )
+
+    stripe_customer_id = db.Column(db.Text, nullable=False)
+    stripe_subscription_id = db.Column(db.Text, nullable=False, unique=True)
+
+    status = db.Column(db.Text, nullable=False)
+
+    current_period_start = db.Column(db.DateTime(timezone=True), nullable=False)
+    current_period_end = db.Column(db.DateTime(timezone=True), nullable=False)
+
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    # -------------------------
+    # Relationships (optional but recommended)
+    # -------------------------
+    user = db.relationship("User", backref=db.backref("subscriptions", lazy="dynamic"))
+    plan = db.relationship("SubscriptionPlan")
+
+
+class PendingCreditGrant(db.Model):
+    __tablename__ = "pending_credit_grants"
+
+    id = db.Column(db.BigInteger, primary_key=True)
+
+    # Stripe identifiers
+    stripe_invoice_id = db.Column(
+        db.String(255),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+
+    stripe_subscription_id = db.Column(
+        db.String(255),
+        nullable=False,
+        index=True,
+    )
+
+    # Optional but useful for debugging / reconciliation
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    def __repr__(self):
+        return (
+            f"<PendingCreditGrant invoice={self.stripe_invoice_id} "
+            f"subscription={self.stripe_subscription_id}>"
+        )

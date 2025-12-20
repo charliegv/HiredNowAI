@@ -67,6 +67,7 @@
             <th class="px-6 py-3">{{ sort_link("Created", "created_at") }}</th>
             <th class="px-6 py-3">Mode</th>
             <th class="px-6 py-3">{{ sort_link("Applications", "applications") }}</th>
+              <th class="px-6 py-3">{{ sort_link("Credits", "credits") }}</th>
             <th class="px-6 py-3">{{ sort_link("Last Application", "last_application") }}</th>
             <th class="px-6 py-3">Admin</th>
             <th class="px-6 py-3 text-right">Actions</th>
@@ -74,7 +75,7 @@
         </thead>
 
         <tbody>
-          {% for user, application_count, last_application in users %}
+          {% for user, application_count, last_application, credits in users %}
           <tr class="border-b hover:bg-gray-50">
 
             <td class="px-6 py-3 text-sm text-gray-600">{{ user.id }}</td>
@@ -102,6 +103,16 @@
             </td>
 
             <td class="px-6 py-3 text-sm font-semibold">{{ application_count }}</td>
+              <td class="px-6 py-3 text-sm font-semibold
+  {% if credits == 0 %}
+    text-red-600
+  {% else %}
+    text-gray-900
+  {% endif %}
+">
+  {{ credits }}
+</td>
+
 
             <td class="px-6 py-3 text-sm text-gray-600">
               {% if last_application %}
@@ -119,16 +130,60 @@
               {% endif %}
             </td>
 
-            <td class="px-6 py-3 text-right">
-              {% if not user.is_admin %}
-                <a href="{{ url_for('admin.impersonate', user_id=user.id) }}"
-                   class="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                  Log in as user
-                </a>
-              {% else %}
-                <span class="text-gray-400 text-sm">—</span>
-              {% endif %}
-            </td>
+<td class="px-6 py-3 text-right space-y-1">
+
+  {% if not user.is_admin %}
+
+    <a href="{{ url_for('admin.impersonate', user_id=user.id) }}"
+       class="block text-blue-600 hover:text-blue-700 text-sm font-medium">
+      Log in
+    </a>
+
+    <!-- Activate / Deactivate -->
+    {% if user.profile.is_active %}
+      <form method="POST"
+            action="{{ url_for('admin.deactivate_user', user_id=user.id) }}">
+        <input type="hidden" name="reason" value="admin_paused">
+        <button class="text-xs text-red-600 hover:underline">
+          Deactivate
+        </button>
+      </form>
+    {% else %}
+      <form method="POST"
+            action="{{ url_for('admin.activate_user', user_id=user.id) }}">
+        <button class="text-xs text-green-600 hover:underline">
+          Activate
+        </button>
+      </form>
+    {% endif %}
+
+    <!-- Credit controls -->
+    <form method="POST"
+          action="{{ url_for('admin.add_credits', user_id=user.id) }}"
+          class="flex gap-1">
+      <input type="number" name="amount" min="1"
+             class="w-14 border rounded px-1 text-xs">
+      <button class="text-xs text-green-600 hover:underline">
+        +Credits
+      </button>
+    </form>
+
+    <form method="POST"
+          action="{{ url_for('admin.remove_credits', user_id=user.id) }}"
+          class="flex gap-1">
+      <input type="number" name="amount" min="1"
+             class="w-14 border rounded px-1 text-xs">
+      <button class="text-xs text-red-600 hover:underline">
+        −Credits
+      </button>
+    </form>
+
+  {% else %}
+    <span class="text-gray-400 text-sm">—</span>
+  {% endif %}
+
+</td>
+
 
           </tr>
           {% endfor %}

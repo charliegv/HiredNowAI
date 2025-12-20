@@ -1,0 +1,157 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="max-w-3xl mx-auto bg-white p-10 rounded-2xl shadow-md">
+
+  {% include "components/progress.html" with context %}
+
+  <!-- CURRENCY SWITCH -->
+  <div class="flex justify-end mb-6">
+    <div class="inline-flex rounded-full border border-gray-300 p-1 text-sm">
+      <button type="button" data-currency="GBP"
+              class="currency-btn px-4 py-1 rounded-full font-semibold transition">
+        GBP £
+      </button>
+      <button type="button" data-currency="USD"
+              class="currency-btn px-4 py-1 rounded-full font-semibold transition">
+        USD $
+      </button>
+    </div>
+  </div>
+
+  <h1 class="text-3xl font-bold mb-3 text-gray-900 text-center">
+    Choose your plan
+  </h1>
+
+  <p class="text-gray-600 text-center mb-3">
+    Unlock more applications with a monthly subscription. Credits remain valid for 12 months.
+  </p>
+
+  <p class="text-sm text-gray-500 text-center mb-4">
+    Built by recruitment tech professionals. Applies only to real company career pages.
+  </p>
+
+  <p class="text-sm text-orange-600 text-center font-medium mb-10">
+    We cap active users to maintain application quality and reliability.
+  </p>
+
+  <!-- PLANS -->
+  {% for currency, plans in plans_by_currency.items() %}
+  <div class="plan-group space-y-6" data-currency="{{ currency }}">
+
+    {% for plan in plans %}
+    <div class="border border-gray-300 rounded-2xl p-6 bg-white shadow-sm transition
+                hover:shadow-md hover:border-gray-400">
+
+      {% if plan.name|lower == "starter" %}
+      <span class="inline-block mb-2 px-3 py-1 text-xs font-semibold
+                   bg-orange-100 text-orange-700 rounded-full">
+        Most popular
+      </span>
+      {% endif %}
+
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+
+        <!-- LEFT -->
+        <div>
+          <h3 class="text-xl font-semibold text-gray-900 capitalize">
+            {{ plan.name }}
+          </h3>
+
+          <p class="text-gray-600 mt-2">
+            Apply to up to <span class="font-semibold">{{ plan.credits_per_period }}</span> real jobs per month
+          </p>
+
+          <!-- PRICE -->
+          <div class="mt-3 flex items-end gap-1">
+            <span class="text-3xl font-bold text-gray-900">
+              {% if plan.currency == "gbp" %}£{% else %}${% endif %}
+              {{ plan.price_amount }}
+            </span>
+            <span class="text-sm text-gray-500 mb-1">/ month</span>
+          </div>
+
+          <p class="text-sm text-gray-500 mt-1">
+            Credits expire 12 months after being added
+          </p>
+        </div>
+
+        <!-- RIGHT -->
+        <div class="text-center">
+          <a href="{{ url_for('billing.subscribe', plan_id=plan.id) }}"
+             class="inline-flex items-center justify-center
+                    bg-blue-600 text-white px-6 py-3 rounded-full
+                    font-semibold text-sm shadow-md
+                    hover:bg-blue-700 transition">
+            Continue with {{ plan.name }}
+          </a>
+
+          <p class="text-xs text-gray-500 mt-2">
+            Pause or cancel anytime in 2 clicks
+          </p>
+        </div>
+
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+  {% endfor %}
+
+  <!-- TRIAL -->
+  <div class="mt-10 border-t pt-8 text-center">
+    <p class="text-gray-600 text-sm mb-4">
+      Not ready yet?
+    </p>
+
+    <a href="{{ url_for('onboarding.edit_cv') }}"
+       class="inline-flex items-center justify-center
+              px-6 py-3 rounded-full
+              border border-gray-300 text-gray-800
+              font-semibold text-sm
+              hover:bg-gray-100 transition">
+      Try 5 applications free before upgrading
+    </a>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  const groups = document.querySelectorAll(".plan-group");
+  const buttons = document.querySelectorAll(".currency-btn");
+
+  function setCurrency(currency) {
+    groups.forEach(g => {
+      g.style.display = g.dataset.currency === currency ? "block" : "none";
+    });
+
+    buttons.forEach(b => {
+      const isActive = b.dataset.currency === currency;
+      b.classList.toggle("bg-blue-600", isActive);
+      b.classList.toggle("text-white", isActive);
+      b.classList.toggle("bg-white", !isActive);
+      b.classList.toggle("text-gray-700", !isActive);
+    });
+
+    localStorage.setItem("preferred_currency", currency);
+  }
+
+  const saved = localStorage.getItem("preferred_currency");
+  if (saved) {
+    setCurrency(saved);
+  } else {
+    const locale = navigator.language || "";
+    setCurrency(locale.startsWith("en-GB") ? "GBP" : "USD");
+  }
+
+  buttons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      setCurrency(btn.dataset.currency);
+    });
+  });
+})();
+</script>
+
+{% endblock %}
