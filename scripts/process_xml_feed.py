@@ -242,7 +242,7 @@ def parse_xml_file(file_path, feed_name, fmt, conn):
         )
 
         lat, lon = (None, None)
-        if not is_remote:
+        if city != "REMOTE":
             lat, lon = geocode_lookup(conn, city, state, country_raw)
 
         salary_min, salary_max = extract_salary(description)
