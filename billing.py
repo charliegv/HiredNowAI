@@ -436,19 +436,19 @@ def buy_credits_page():
     credit_packs = {
         "GBP": [
             {
-                "price_id": "price_1Sh904RW5PkCYvO3NlxGIn1i",
+                "price_id": "price_1Sh9zFRW5PkCYvO3R6RuVAjL",
                 "credits": 15,
                 "price": 5,
                 "currency_symbol": "£",
             },
             {
-                "price_id": "price_1Sh91MRW5PkCYvO3HDwXxToK",
+                "price_id": "price_1Sh9zDRW5PkCYvO3ZSdG84Y3",
                 "credits": 30,
                 "price": 10,
                 "currency_symbol": "£",
             },
             {
-                "price_id": "price_1Sh935RW5PkCYvO3b1HD7wgi",
+                "price_id": "price_1Sh9zARW5PkCYvO345OoUqX7",
                 "credits": 80,
                 "price": 25,
                 "currency_symbol": "£",
@@ -456,19 +456,19 @@ def buy_credits_page():
         ],
         "USD": [
             {
-                "price_id": "price_1Sh90ZRW5PkCYvO3HSVmIn1c",
+                "price_id": "price_1Sh9zFRW5PkCYvO34bx7x3qZ",
                 "credits": 15,
                 "price": 7,
                 "currency_symbol": "$",
             },
             {
-                "price_id": "price_1Sh929RW5PkCYvO36JX37zZt",
+                "price_id": "price_1Sh9zDRW5PkCYvO3HEaMTBD1",
                 "credits": 30,
                 "price": 14,
                 "currency_symbol": "$",
             },
             {
-                "price_id": "price_1Sh936RW5PkCYvO35L7tFQgO",
+                "price_id": "price_1Sh9zARW5PkCYvO3VCh2gK9S",
                 "credits": 80,
                 "price": 34,
                 "currency_symbol": "$",
