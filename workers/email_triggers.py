@@ -31,7 +31,6 @@ def run():
 
         for user, profile in users:
             # Skip if user has a subscription
-            print(user)
             has_sub = (
                 UserSubscription.query
                 .filter_by(user_id=user.id)
@@ -52,6 +51,7 @@ def run():
                 continue
 
             # Send email
+            print(user)
             send_onboarding_bounce_email(user)
 
             #Record event (DB-enforced idempotency)

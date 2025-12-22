@@ -31,7 +31,7 @@ Log back in to continue.
         auth=("api", MAILGUN_API_KEY),
         data={
             "from": f"HiredNow AI <no-reply@{MAILGUN_DOMAIN}>",
-            "to": 'cgvinall@gmail.com', #[user.email],
+            "to": [user.email],
             "subject": "You still have 5 free applications waiting",
             "text": text_body,
             "html": html_body,
