@@ -10,9 +10,10 @@ if PROJECT_ROOT not in sys.path:
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import datetime, timedelta
-from models import db, User, Profile, UserSubscription, EmailEvent
+from models import db, User, Profile, UserSubscription, EmailEvent, CreditBalance
 from app import create_app
 from emails.onboarding_bounce import send_onboarding_bounce_email
+from emails.credits_exhausted import send_credits_exhausted_email
 from sqlalchemy.exc import IntegrityError
 
 def run():
@@ -65,6 +66,49 @@ def run():
                 db.session.commit()
             except IntegrityError:
                 db.session.rollback()
+
+        # --------------------------------------------------
+        # 2. Credits exhausted email (NEW)
+        # --------------------------------------------------
+
+        exhausted_users = (
+            db.session.query(User, CreditBalance)
+            .join(CreditBalance, CreditBalance.user_id == User.id)
+            .filter(CreditBalance.available_credits == 0)
+            .all()
+        )
+
+        for user, balance in exhausted_users:
+
+            # Skip active subscribers
+            has_sub = (
+                UserSubscription.query
+                .filter_by(user_id=user.id)
+                .filter(UserSubscription.status.in_(["active", "trialing"]))
+                .first()
+            )
+            if has_sub:
+                continue
+
+            # Idempotency
+            already_sent = EmailEvent.query.filter_by(
+                user_id=user.id,
+                event_type="credits_exhausted"
+            ).first()
+
+            if already_sent:
+                continue
+
+            print(f"Exhausted: {user}")
+            send_credits_exhausted_email(user)
+
+            db.session.add(
+                EmailEvent(
+                    user_id=user.id,
+                    event_type="credits_exhausted"
+                )
+            )
+            db.session.commit()
 
 if __name__ == '__main__':
     run()
