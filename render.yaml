@@ -122,3 +122,20 @@ services:
       - key: OPENAI_API_KEY
         sync: false
 
+# -----------------------------------------------------
+# 6. Cron Job – Lifecycle Email Triggers
+# -----------------------------------------------------
+  - type: cron
+    name: cron-lifecycle-emails
+    env: python
+    branch: master
+    schedule: "0 * * * *"   # every hour
+    buildCommand: pip install -r requirements.txt
+    startCommand: python workers/email_triggers.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: MAILGUN_DOMAIN
+        sync: false
+      - key: MAILGUN_API_KEY
+        sync: false

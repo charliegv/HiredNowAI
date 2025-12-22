@@ -368,3 +368,95 @@ class ContactMessage(db.Model):
     message = db.Column(db.Text, nullable=False)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+
+class EmailEvent(db.Model):
+    __tablename__ = "email_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Who the email is for
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    # Type of lifecycle email
+    # e.g. onboarding_bounce, trial_expiring, low_credits
+    event_type = db.Column(
+        db.String(50),
+        nullable=False,
+        index=True
+    )
+
+    # Optional contextual identifier
+    # e.g. onboarding_step_5, credits_0
+    context = db.Column(
+        db.String(100),
+        nullable=True
+    )
+
+    # Delivery metadata
+    provider = db.Column(
+        db.String(30),
+        nullable=False,
+        default="mailgun"
+    )
+
+    provider_message_id = db.Column(
+        db.String(255),
+        nullable=True,
+        unique=True
+    )
+
+    status = db.Column(
+        db.String(20),
+        nullable=False,
+        default="sent"
+        # sent | failed | opened | clicked | bounced
+    )
+
+    # Timing
+    sent_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        index=True
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=True,
+        onupdate=datetime.utcnow
+    )
+
+
+    # -----------------------------
+    # Constraints
+    # -----------------------------
+    __table_args__ = (
+        # Prevent duplicate emails of same type + context
+        db.UniqueConstraint(
+            "user_id",
+            "event_type",
+            "context",
+            name="uq_email_event_user_type_context"
+        ),
+    )
+
+    def __repr__(self):
+        return (
+            f"<EmailEvent user_id={self.user_id} "
+            f"type={self.event_type} "
+            f"context={self.context} "
+            f"status={self.status}>"
+        )
