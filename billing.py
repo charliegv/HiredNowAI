@@ -1,5 +1,5 @@
 import stripe
-from flask import Blueprint, redirect, url_for, request
+from flask import Blueprint, redirect, url_for, request, render_template
 from flask_login import login_required, current_user
 from models import db, SubscriptionPlan, UserSubscription, CreditLedger, CreditBalance, Profile, PendingCreditGrant
 import os
@@ -9,9 +9,83 @@ from dotenv import load_dotenv
 load_dotenv()
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-print(os.getenv("STRIPE_SECRET_KEY"))
 
 billing_bp = Blueprint("billing", __name__)
+
+# CREDIT_PACKS_testing = {
+#     "price_1Sh904RW5PkCYvO3NlxGIn1i": 15, #price_15_gbp
+#     "price_1Sh90ZRW5PkCYvO3HSVmIn1c": 15, #price_15_usd
+#     "price_1Sh91MRW5PkCYvO3HDwXxToK": 30, #price_30_gbp
+#     "price_1Sh929RW5PkCYvO36JX37zZt": 30, #price_30_usd
+#     "price_1Sh935RW5PkCYvO3b1HD7wgi": 80, #price_80_gbp
+#     "price_1Sh936RW5PkCYvO35L7tFQgO": 80, #price_80_usd
+# }
+CREDIT_PACKS = {
+    "price_1Sh9zFRW5PkCYvO3R6RuVAjL": 15, #price_15_gbp
+    "price_1Sh9zFRW5PkCYvO34bx7x3qZ": 15, #price_15_usd
+    "price_1Sh9zDRW5PkCYvO3ZSdG84Y3": 30, #price_30_gbp
+    "price_1Sh9zDRW5PkCYvO3HEaMTBD1": 30, #price_30_usd
+    "price_1Sh9zARW5PkCYvO345OoUqX7": 80, #price_80_gbp
+    "price_1Sh9zARW5PkCYvO3VCh2gK9S": 80, #price_80_usd
+}
+
+
+def handle_credit_pack_checkout(session):
+    # Idempotency
+    if CreditLedger.query.filter_by(
+        reference_id=session["id"],
+        reason="credit_pack"
+    ).first():
+        return
+
+    metadata = session.get("metadata") or {}
+    user_id = metadata.get("user_id")
+    credits = metadata.get("credits")
+
+    if not user_id or not credits:
+        return
+
+    user_id = int(user_id)
+    credits = int(credits)
+
+    balance = (
+        CreditBalance.query
+        .filter_by(user_id=user_id)
+        .with_for_update()
+        .first()
+    )
+
+    if not balance:
+        balance = CreditBalance(
+            user_id=user_id,
+            available_credits=0,
+            lifetime_granted=0,
+            lifetime_spent=0,
+        )
+        db.session.add(balance)
+        db.session.flush()
+
+    balance.available_credits += credits
+    balance.lifetime_granted += credits
+
+    db.session.add(
+        CreditLedger(
+            user_id=user_id,
+            change_amount=credits,
+            reason="credit_pack",
+            reference_id=session["id"],
+        )
+    )
+
+    # Reactivate automation if paused due to credits
+    profile = Profile.query.filter_by(user_id=user_id).first()
+    if profile and not profile.is_active:
+        profile.is_active = True
+        profile.application_mode = "auto"
+        profile.deactivate_reason = None
+
+    db.session.commit()
+
 
 
 def handle_invoice_paid(invoice):
@@ -275,6 +349,8 @@ def stripe_webhook():
         if event_type == "checkout.session.completed":
             if obj.get("mode") == "subscription":
                 handle_checkout_completed(obj)
+            elif obj.get("mode") == "payment":
+                handle_credit_pack_checkout(obj)
 
         elif event_type == "invoice.paid":
             handle_invoice_paid(obj)
@@ -313,3 +389,96 @@ def billing_portal():
     )
 
     return redirect(session.url)
+
+
+@billing_bp.route("/buy-credits/<price_id>")
+@login_required
+def buy_credits(price_id):
+    if price_id not in CREDIT_PACKS:
+        return redirect(url_for("dashboard.dashboard_home"))
+
+    session = stripe.checkout.Session.create(
+        mode="payment",
+        customer=current_user.stripe_customer_id if hasattr(current_user, "stripe_customer_id") else None,
+        customer_email=current_user.email,
+        line_items=[{
+            "price": price_id,
+            "quantity": 1,
+        }],
+        metadata={
+            "user_id": current_user.id,
+            "credits": CREDIT_PACKS[price_id],
+            "price_id": price_id,
+        },
+        success_url=url_for("dashboard.dashboard_home", _external=True),
+        cancel_url=url_for("dashboard.dashboard_home", _external=True),
+    )
+
+    return redirect(session.url)
+
+
+@billing_bp.route("/buy-credits")
+@login_required
+def buy_credits_page():
+    plans = SubscriptionPlan.query.filter_by(active=True).all()
+    subscription = (
+        UserSubscription.query
+        .filter_by(user_id=current_user.id)
+        .order_by(UserSubscription.created_at.desc())
+        .first()
+    )
+
+    plans_by_currency = {
+        "GBP": [p for p in plans if p.currency == "gbp"],
+        "USD": [p for p in plans if p.currency == "usd"],
+    }
+
+    credit_packs = {
+        "GBP": [
+            {
+                "price_id": "price_1Sh904RW5PkCYvO3NlxGIn1i",
+                "credits": 15,
+                "price": 5,
+                "currency_symbol": "£",
+            },
+            {
+                "price_id": "price_1Sh91MRW5PkCYvO3HDwXxToK",
+                "credits": 30,
+                "price": 10,
+                "currency_symbol": "£",
+            },
+            {
+                "price_id": "price_1Sh935RW5PkCYvO3b1HD7wgi",
+                "credits": 80,
+                "price": 25,
+                "currency_symbol": "£",
+            },
+        ],
+        "USD": [
+            {
+                "price_id": "price_1Sh90ZRW5PkCYvO3HSVmIn1c",
+                "credits": 15,
+                "price": 7,
+                "currency_symbol": "$",
+            },
+            {
+                "price_id": "price_1Sh929RW5PkCYvO36JX37zZt",
+                "credits": 30,
+                "price": 14,
+                "currency_symbol": "$",
+            },
+            {
+                "price_id": "price_1Sh936RW5PkCYvO35L7tFQgO",
+                "credits": 80,
+                "price": 34,
+                "currency_symbol": "$",
+            },
+        ],
+    }
+
+    return render_template(
+        "buy_credits.html",
+        plans_by_currency=plans_by_currency,
+        credit_packs=credit_packs,
+	    subscription=subscription,
+    )

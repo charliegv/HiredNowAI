@@ -217,7 +217,7 @@ async def mark_success(pool, app_id, user_id):
         await consume_credit(pool, user_id, app_id)
     except InsufficientCredits:
         logging.warning(f"[Worker] User {user_id} credits exhausted, pausing automation")
-        await deactivate_user(pool, user_id, "credits_exhausted")
+        #await deactivate_user(pool, user_id, "credits_exhausted")
 
 
 

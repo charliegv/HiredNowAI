@@ -1,0 +1,213 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="max-w-4xl mx-auto bg-white p-10 rounded-2xl shadow-md">
+
+  <!-- CURRENCY SWITCH -->
+  <div class="flex justify-end mb-6">
+    <div class="inline-flex rounded-full border border-gray-300 p-1 text-sm">
+      <button type="button" data-currency="GBP"
+              class="currency-btn px-4 py-1 rounded-full font-semibold transition">
+        GBP £
+      </button>
+      <button type="button" data-currency="USD"
+              class="currency-btn px-4 py-1 rounded-full font-semibold transition">
+        USD $
+      </button>
+    </div>
+  </div>
+
+  <h1 class="text-3xl font-bold text-gray-900 text-center mb-2">
+    Get more applications
+  </h1>
+{% if not subscription %}
+  <p class="text-gray-600 text-center mb-10">
+    Would you like to save money with a subscription or buy credits with no commitment?
+  </p>
+    {% else %}
+      <p class="text-gray-600 text-center mb-10">
+    Top up your subscription with one off credits
+  </p>
+    {% endif %}
+
+    {% if not subscription %}
+<!-- ACCORDION: SUBSCRIPTIONS -->
+<div class="border border-blue-300 rounded-2xl mb-6 overflow-hidden">
+
+  <button type="button"
+          class="accordion-toggle w-full flex items-center justify-between
+                 px-6 py-4 bg-blue-50 hover:bg-blue-100 transition"
+          data-target="subscriptions">
+    <div>
+      <p class="font-semibold text-blue-900">
+        Monthly subscription (best value)
+      </p>
+      <p class="text-sm text-blue-700">
+        Save money and keep applications running automatically
+      </p>
+    </div>
+    <span class="accordion-icon text-blue-700 text-xl">+</span>
+  </button>
+
+  <!-- CLOSED BY DEFAULT -->
+  <div id="subscriptions" class="accordion-panel hidden px-6 py-6 space-y-6">
+
+
+      {% for currency, plans in plans_by_currency.items() %}
+      <div class="plan-group space-y-4" data-currency="{{ currency }}">
+
+        {% for plan in plans %}
+        <div class="border border-gray-300 rounded-xl p-5 hover:shadow-md transition">
+
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 capitalize">
+                {{ plan.name }}
+              </h3>
+
+              <p class="text-gray-600 mt-1">
+                {{ plan.credits_per_period }} applications per month
+              </p>
+
+              <div class="mt-2 flex items-end gap-1">
+                <span class="text-3xl font-bold text-gray-900">
+                  {% if plan.currency == "gbp" %}£{% else %}${% endif %}
+                  {{ plan.price_amount }}
+                </span>
+                <span class="text-sm text-gray-500 mb-1">/ month</span>
+              </div>
+            </div>
+
+            <a href="{{ url_for('billing.subscribe', plan_id=plan.id) }}"
+               class="inline-flex items-center justify-center
+                      bg-blue-600 text-white px-6 py-3 rounded-full
+                      font-semibold text-sm hover:bg-blue-700 transition shadow">
+              Subscribe
+            </a>
+
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+
+    {% endif %}
+<!-- ACCORDION: CREDIT PACKS -->
+<div class="border border-gray-300 rounded-2xl overflow-hidden">
+
+  <button type="button"
+          class="accordion-toggle w-full flex items-center justify-between
+                 px-6 py-4 bg-gray-50 hover:bg-gray-100 transition"
+          data-target="credit-packs">
+    <div>
+      <p class="font-semibold text-gray-900">
+        One-off credit packs
+      </p>
+      <p class="text-sm text-gray-600">
+        No subscription. Buy credits only when you need them.
+      </p>
+    </div>
+    <span class="accordion-icon text-gray-600 text-xl">+</span>
+  </button>
+
+  <!-- CLOSED BY DEFAULT -->
+  <div id="credit-packs" class="accordion-panel hidden px-6 py-6">
+
+
+      {% for currency, packs in credit_packs.items() %}
+      <div class="plan-group grid grid-cols-1 md:grid-cols-3 gap-6"
+           data-currency="{{ currency }}">
+
+        {% for pack in packs %}
+        <div class="border border-gray-300 rounded-xl p-6 text-center hover:shadow-md transition">
+
+          <p class="text-3xl font-bold text-gray-900">
+            {{ pack.credits }}
+          </p>
+
+          <p class="text-sm text-gray-600 mt-1">
+            applications
+          </p>
+
+          <p class="text-xl font-semibold text-gray-900 mt-3">
+            {{ pack.currency_symbol }}{{ pack.price }}
+          </p>
+
+<a href="{{ url_for('billing.buy_credits', price_id=pack.price_id) }}"
+   class="inline-flex items-center justify-center mt-4
+          w-full px-4 py-2 rounded-full
+          bg-blue-600 text-white
+          text-sm font-semibold
+          hover:bg-blue-700 transition shadow">
+  Buy credits
+</a>
+
+
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+
+</div>
+
+<!-- ACCORDION + CURRENCY SCRIPT -->
+<script>
+(function () {
+
+  // Accordion
+  document.querySelectorAll(".accordion-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const targetId = btn.dataset.target;
+      const panel = document.getElementById(targetId);
+      const icon = btn.querySelector(".accordion-icon");
+
+      const isOpen = !panel.classList.contains("hidden");
+
+      document.querySelectorAll(".accordion-panel").forEach(p => p.classList.add("hidden"));
+      document.querySelectorAll(".accordion-icon").forEach(i => i.textContent = "+");
+
+      if (!isOpen) {
+        panel.classList.remove("hidden");
+        icon.textContent = "−";
+      }
+    });
+  });
+
+  // Currency
+  const groups = document.querySelectorAll(".plan-group");
+  const buttons = document.querySelectorAll(".currency-btn");
+
+  function setCurrency(currency) {
+    groups.forEach(g => {
+      g.style.display = g.dataset.currency === currency ? "grid" : "none";
+    });
+
+    buttons.forEach(b => {
+      const active = b.dataset.currency === currency;
+      b.classList.toggle("bg-blue-600", active);
+      b.classList.toggle("text-white", active);
+      b.classList.toggle("bg-white", !active);
+      b.classList.toggle("text-gray-700", !active);
+    });
+
+    localStorage.setItem("preferred_currency", currency);
+  }
+
+  const saved = localStorage.getItem("preferred_currency");
+  setCurrency(saved || (navigator.language.startsWith("en-GB") ? "GBP" : "USD"));
+
+  buttons.forEach(btn => {
+    btn.addEventListener("click", () => setCurrency(btn.dataset.currency));
+  });
+
+})();
+</script>
+
+{% endblock %}
