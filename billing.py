@@ -294,3 +294,22 @@ def stripe_webhook():
 
     return "", 200
 
+@billing_bp.route("/billing/portal")
+@login_required
+def billing_portal():
+    sub = (
+        UserSubscription.query
+        .filter_by(user_id=current_user.id)
+        .order_by(UserSubscription.created_at.desc())
+        .first()
+    )
+
+    if not sub:
+        return redirect(url_for("onboarding.onboarding_plan"))
+
+    session = stripe.billing_portal.Session.create(
+        customer=sub.stripe_customer_id,
+        return_url=url_for("dashboard.dashboard_home", _external=True),
+    )
+
+    return redirect(session.url)

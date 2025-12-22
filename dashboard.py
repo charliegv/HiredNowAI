@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, send_file, redirect, jsonify
 from flask_login import login_required, current_user
-from models import db, Profile, PendingApplication, Application, Match, Job, CreditBalance
+from models import db, Profile, PendingApplication, Application, Match, Job, CreditBalance, UserSubscription
 
 from datetime import datetime
 from sqlalchemy import desc
@@ -20,10 +20,16 @@ def dashboard_home():
 
     profile = current_user.profile
 
-    credit_balance = CreditBalance.query.filter_by(
-	    user_id=current_user.id
-    ).first()
+    subscription = (
+        UserSubscription.query
+        .filter_by(user_id=current_user.id)
+        .order_by(UserSubscription.created_at.desc())
+        .first()
+    )
 
+    credit_balance = CreditBalance.query.filter_by(
+        user_id=current_user.id
+    ).first()
     available_credits = credit_balance.available_credits if credit_balance else 0
 
     # Fetch recent applications
@@ -85,6 +91,7 @@ def dashboard_home():
         matches=matches,
 	    manual_required=manual_required,
 	    available_credits=available_credits,
+	    subscription=subscription,
     )
 
 @dashboard.route("/application/<int:app_id>/manual-complete", methods=["POST"])

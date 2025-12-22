@@ -6,6 +6,9 @@ from dashboard import dashboard
 from onboarding import onboarding
 from profile import preferences
 from flask_login import LoginManager
+from contact import contact
+from admin.routes import admin_bp
+from billing import billing_bp
 
 
 
@@ -35,11 +38,11 @@ def create_app():
     app.register_blueprint(onboarding)
 
     # >>> ADD THIS PART <<<
-    from admin.routes import admin_bp
-    from billing import billing_bp
 
     app.register_blueprint(billing_bp, url_prefix="/billing")
     app.register_blueprint(admin_bp, url_prefix="/admin")
+
+    app.register_blueprint(contact)
 
     return app
 

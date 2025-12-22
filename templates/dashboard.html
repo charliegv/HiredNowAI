@@ -4,65 +4,50 @@
 
 <div class="max-w-6xl mx-auto py-8 px-4">
 
-  <!-- HEADER AND MODE CHIPS -->
-  <div class="mb-6">
-      {% if session.admin_id %}
-  <div class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 flex flex-wrap items-center justify-between gap-4">
+  <!-- ALERT STACK -->
+  <div class="space-y-4 mb-8">
 
-    <div class="text-sm text-red-700 font-medium">
-      You are currently impersonating this user.
+    {% if session.admin_id %}
+    <div class="rounded-xl border border-red-200 bg-red-50 p-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="text-sm text-red-700 font-medium">
+        You are currently impersonating this user.
+      </div>
+      <a href="{{ url_for('admin.stop_impersonation') }}"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg
+                bg-red-600 text-white text-sm font-semibold
+                hover:bg-red-700 transition shadow">
+        Exit admin impersonation
+      </a>
     </div>
+    {% endif %}
 
-    <a href="{{ url_for('admin.stop_impersonation') }}"
-       class="inline-flex items-center gap-2 px-4 py-2 rounded-lg
-              bg-red-600 text-white text-sm font-semibold
-              hover:bg-red-700 transition shadow">
-      Exit admin impersonation
-    </a>
+    {% if not profile.is_active %}
+    <div class="rounded-xl border border-red-200 bg-red-50 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <p class="text-sm font-semibold text-red-700">
+          Your account is currently on hold
+        </p>
+        <p class="text-sm text-red-600 mt-1">
+          {{ profile.deactivate_reason|replace("_"," ")|capitalize }}
+        </p>
+      </div>
+      <a href="{{ url_for('preferences.preferences_page') }}"
+         class="inline-flex items-center justify-center px-5 py-2 rounded-lg
+                bg-red-600 text-white text-sm font-semibold
+                hover:bg-red-700 transition shadow">
+        Resolve
+      </a>
+    </div>
+    {% endif %}
 
   </div>
-{% endif %}
 
-      {% if not profile.is_active %}
-<div class="mb-8 rounded-xl border border-red-200 bg-red-50 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
-  <div>
-    <p class="text-sm font-semibold text-red-700">
-      Your account is currently on hold
-    </p>
-    <p class="text-sm text-red-600 mt-1">
-      Reason:
-      {% if profile.deactivate_reason == "credits_exhausted" %}
-        You have used all of your available credits.
-      {% elif profile.deactivate_reason == "payment_failed" %}
-        Your last payment failed.
-      {% elif profile.deactivate_reason == "user_paused" %}
-        You paused automation manually.
-      {% elif profile.deactivate_reason == "admin_paused" %}
-        Automation was paused by an administrator.
-      {% else %}
-        Automation is temporarily unavailable.
-      {% endif %}
-    </p>
-  </div>
-
-  <a href="{{ url_for('preferences.preferences_page') }}"
-     class="inline-flex items-center justify-center px-5 py-2 rounded-lg
-            bg-red-600 text-white text-sm font-semibold
-            hover:bg-red-700 transition shadow">
-    Resolve
-  </a>
-
-</div>
-{% endif %}
-
-
+  <!-- HEADER -->
+  <div class="mb-8">
     <h1 class="text-3xl font-semibold text-gray-900 flex flex-wrap items-center gap-3">
       Welcome back, {{ current_user.profile.first_name or current_user.email }}
 
-      <!-- Application mode chip -->
-      <span
-        class="px-3 py-1 text-xs rounded-full
+      <span class="px-3 py-1 text-xs rounded-full
         {% if profile.application_mode == 'auto' %}
           bg-green-100 text-green-700
         {% else %}
@@ -71,7 +56,6 @@
         {{ profile.application_mode | capitalize }} mode
       </span>
 
-      <!-- Matching mode chip -->
       <span class="px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-700">
         {{ profile.match_mode | capitalize }} matching
       </span>
@@ -82,11 +66,8 @@
     </p>
   </div>
 
-
-
-  <!-- TOP ACTION BAR -->
-  <div class="flex flex-wrap gap-3 mb-10">
-
+  <!-- ACTION BAR -->
+  <div class="flex flex-wrap gap-3 mb-8">
     <a href="{{ url_for('onboarding.cv_preview') }}"
        class="px-5 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition text-sm font-medium">
       View CV
@@ -101,31 +82,93 @@
        class="px-5 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-100 transition text-sm font-medium">
       Preferences
     </a>
+  </div>
+
+  <!-- DASHBOARD SUMMARY -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+
+    <!-- SUBSCRIPTION -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+      <h2 class="text-sm font-semibold text-gray-500 mb-3">Subscription</h2>
+
+      {% if subscription %}
+        <p class="text-lg font-semibold text-gray-900 mb-1">
+          {{ subscription.plan.name|capitalize }}
+        </p>
+
+        <span class="inline-flex px-2 py-1 rounded-full text-xs mb-3
+          {% if subscription.status == 'active' %}
+            bg-green-100 text-green-700
+          {% else %}
+            bg-yellow-100 text-yellow-700
+          {% endif %}
+        ">
+          {{ subscription.status|capitalize }}
+        </span>
+
+        <p class="text-sm text-gray-600">
+          Renews on {{ subscription.current_period_end.strftime("%d %b %Y") }}
+        </p>
+
+        <a href="{{ url_for('billing.billing_portal') }}"
+           class="mt-4 inline-flex items-center justify-center
+                  bg-blue-600 text-white px-4 py-2 rounded-lg
+                  text-sm font-semibold hover:bg-blue-700 transition">
+          Manage billing
+        </a>
+
+      {% else %}
+        <p class="text-sm text-gray-600 mb-4">
+          Free trial active
+        </p>
+        <a href="{{ url_for('onboarding.onboarding_plan') }}"
+           class="inline-flex items-center justify-center
+                  bg-blue-600 text-white px-4 py-2 rounded-lg
+                  text-sm font-semibold hover:bg-blue-700 transition">
+          Upgrade plan
+        </a>
+      {% endif %}
+    </div>
+
+    <!-- APPLICATIONS SENT -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+      <p class="text-sm text-gray-500 mb-1">Applications sent</p>
+      <p class="text-3xl font-bold text-gray-900">{{ stats.applications_sent }}</p>
+    </div>
+
+    <!-- CREDITS -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+      <p class="text-sm text-gray-500 mb-1">Credits remaining</p>
+      <p class="text-3xl font-bold {% if available_credits > 0 %}text-gray-900{% else %}text-red-600{% endif %}">
+        {{ available_credits }}
+      </p>
+      <p class="text-sm mt-1 {% if available_credits > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+        {% if available_credits > 0 %}
+          Ready to apply
+        {% else %}
+          Automation paused
+        {% endif %}
+      </p>
+    </div>
 
   </div>
 
+  <!-- METRICS -->
+  <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-10">
+    <div class="flex items-center justify-between cursor-pointer" onclick="toggleMetrics()">
+      <h2 class="text-xl font-semibold text-gray-900">Metrics</h2>
+      <span id="metricsToggleIcon" class="text-gray-500 text-xl">+</span>
+    </div>
 
-        <!-- METRICS SECTION -->
-<div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-10">
-
-  <div class="flex items-center justify-between cursor-pointer"
-       onclick="toggleMetrics()">
-    <h2 class="text-xl font-semibold text-gray-900">Metrics</h2>
-
-    <span id="metricsToggleIcon" class="text-gray-500 text-xl">+</span>
-  </div>
-
-  <div id="metricsPanel" class="mt-6 hidden">
-    <p class="text-gray-600 text-sm mb-4">
-      Applications successfully submitted per day (last 60 days)
-    </p>
-
+    <div id="metricsPanel" class="mt-6 hidden">
+      <p class="text-gray-600 text-sm mb-4">
+        Applications successfully submitted per day (last 60 days)
+      </p>
       <div class="w-full h-64">
-  <canvas id="metricsChart"></canvas>
-
+        <canvas id="metricsChart"></canvas>
+      </div>
     </div>
   </div>
-</div>
     <!-- STATS GRID -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
 
@@ -982,6 +1025,7 @@ async function loadMetrics() {
   });
 }
 </script>
+
 
 
 {% endblock %}

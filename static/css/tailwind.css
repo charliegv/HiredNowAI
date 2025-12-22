@@ -1357,6 +1357,10 @@ video {
   line-height: 1.625;
 }
 
+.tracking-tight {
+  letter-spacing: -0.025em;
+}
+
 .text-blue-600 {
   --tw-text-opacity: 1;
   color: rgb(255 122 0 / var(--tw-text-opacity, 1));
@@ -1415,6 +1419,11 @@ video {
 .text-green-800 {
   --tw-text-opacity: 1;
   color: rgb(22 101 52 / var(--tw-text-opacity, 1));
+}
+
+.text-orange-500 {
+  --tw-text-opacity: 1;
+  color: rgb(249 115 22 / var(--tw-text-opacity, 1));
 }
 
 .text-orange-600 {
@@ -1679,5 +1688,11 @@ video {
   .md\:text-sm {
     font-size: 0.875rem;
     line-height: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .lg\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
