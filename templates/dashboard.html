@@ -84,74 +84,7 @@
     </a>
   </div>
 
-  <!-- DASHBOARD SUMMARY -->
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
 
-    <!-- SUBSCRIPTION -->
-    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-      <h2 class="text-sm font-semibold text-gray-500 mb-3">Subscription</h2>
-
-      {% if subscription %}
-        <p class="text-lg font-semibold text-gray-900 mb-1">
-          {{ subscription.plan.name|capitalize }}
-        </p>
-
-        <span class="inline-flex px-2 py-1 rounded-full text-xs mb-3
-          {% if subscription.status == 'active' %}
-            bg-green-100 text-green-700
-          {% else %}
-            bg-yellow-100 text-yellow-700
-          {% endif %}
-        ">
-          {{ subscription.status|capitalize }}
-        </span>
-
-        <p class="text-sm text-gray-600">
-          Renews on {{ subscription.current_period_end.strftime("%d %b %Y") }}
-        </p>
-
-        <a href="{{ url_for('billing.billing_portal') }}"
-           class="mt-4 inline-flex items-center justify-center
-                  bg-blue-600 text-white px-4 py-2 rounded-lg
-                  text-sm font-semibold hover:bg-blue-700 transition">
-          Manage billing
-        </a>
-
-      {% else %}
-        <p class="text-sm text-gray-600 mb-4">
-          Free trial active
-        </p>
-        <a href="{{ url_for('onboarding.onboarding_plan') }}"
-           class="inline-flex items-center justify-center
-                  bg-blue-600 text-white px-4 py-2 rounded-lg
-                  text-sm font-semibold hover:bg-blue-700 transition">
-          Upgrade plan
-        </a>
-      {% endif %}
-    </div>
-
-    <!-- APPLICATIONS SENT -->
-    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-      <p class="text-sm text-gray-500 mb-1">Applications sent</p>
-      <p class="text-3xl font-bold text-gray-900">{{ stats.applications_sent }}</p>
-    </div>
-
-    <!-- CREDITS -->
-    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-      <p class="text-sm text-gray-500 mb-1">Credits remaining</p>
-      <p class="text-3xl font-bold {% if available_credits > 0 %}text-gray-900{% else %}text-red-600{% endif %}">
-        {{ available_credits }}
-      </p>
-      <p class="text-sm mt-1 {% if available_credits > 0 %}text-green-600{% else %}text-red-600{% endif %}">
-        {% if available_credits > 0 %}
-          Ready to apply
-        {% else %}
-          Automation paused
-        {% endif %}
-      </p>
-    </div>
-
-  </div>
 
   <!-- METRICS -->
   <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-10">
@@ -170,48 +103,111 @@
     </div>
   </div>
     <!-- STATS GRID -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+<!-- METRICS SUMMARY ROW -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
 
-    <!-- Applications sent -->
-    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-      <p class="text-gray-600 text-sm mb-1">Applications sent</p>
-      <p class="text-3xl font-bold text-gray-900">{{ stats.applications_sent }}</p>
-    </div>
+  <!-- Applications sent -->
+  <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+    <p class="text-gray-600 text-sm mb-1">Applications sent</p>
+    <p class="text-3xl font-bold text-gray-900">
+      {{ stats.applications_sent }}
+    </p>
+  </div>
 
-    <!-- Matching jobs -->
-    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-      <p class="text-gray-600 text-sm mb-1">Matching jobs</p>
-      <p class="text-3xl font-bold text-gray-900">{{ stats.match_count }}</p>
-      <p class="text-sm text-gray-500 mt-1">Based on your preferences</p>
-    </div>
+  <!-- Matching jobs -->
+  <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+    <p class="text-gray-600 text-sm mb-1">Matching jobs</p>
+    <p class="text-3xl font-bold text-gray-900">
+      {{ stats.match_count }}
+    </p>
+    <p class="text-sm text-gray-500 mt-1">
+      Based on your preferences
+    </p>
+  </div>
 
-      <!-- Credits remaining -->
-<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-  <p class="text-gray-600 text-sm mb-1">Credits remaining</p>
+  <!-- Credits remaining -->
+  <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+    <p class="text-gray-600 text-sm mb-1">Credits remaining</p>
+    <p class="text-3xl font-bold {% if available_credits > 0 %}text-gray-900{% else %}text-red-600{% endif %}">
+      {{ available_credits }}
+    </p>
 
-  <p class="text-3xl font-bold
-     {% if available_credits > 0 %}
-       text-gray-900
+    {% if available_credits > 0 %}
+      <p class="text-sm text-green-600 mt-1">Ready to apply</p>
+    {% else %}
+      <p class="text-sm text-red-600 mt-1">Automation paused</p>
+    {% endif %}
+  </div>
+
+<!-- Subscription -->
+<div class="p-6 rounded-xl border-2
+     {% if not subscription %}
+       border-blue-500 bg-blue-50 shadow-md
      {% else %}
-       text-red-600
+       border-gray-100 bg-white shadow-sm
+     {% endif %}
+">
+
+  <p class="text-sm font-semibold mb-1
+     {% if not subscription %}
+       text-blue-700
+     {% else %}
+       text-gray-600
      {% endif %}
   ">
-    {{ available_credits }}
+    Subscription
   </p>
 
-  {% if available_credits > 0 %}
-    <p class="text-sm text-green-600 mt-1">
-      Ready to apply
+  {% if subscription %}
+    <p class="text-lg font-semibold text-gray-900 capitalize">
+      {{ subscription.plan.name }}
     </p>
+
+    <p class="text-sm text-gray-600 mt-1">
+      Renews {{ subscription.current_period_end.strftime("%d %b %Y") }}
+    </p>
+
+    <a href="{{ url_for('billing.billing_portal') }}"
+       class="inline-block mt-3 text-blue-600 hover:text-blue-700 text-sm font-semibold">
+      Manage
+    </a>
+
   {% else %}
-    <p class="text-sm text-red-600 mt-1">
-      Automation paused
+    <!-- FREE TRIAL STATE -->
+    <div class="flex items-center gap-2 mt-1">
+<span class="inline-flex items-center gap-1
+             px-3 py-1 rounded-full
+             text-xs font-semibold
+             bg-orange-100 text-orange-700
+             whitespace-nowrap">
+  Free trial
+</span>
+
+      </span>
+      <span class="text-xs text-blue-700 font-medium">
+        Limited automation
+      </span>
+    </div>
+
+    <p class="text-sm text-blue-800 mt-2 leading-snug">
+      Upgrade to keep applications running.
     </p>
+
+    <a href="{{ url_for('onboarding.onboarding_plan') }}"
+       class="inline-flex items-center justify-center mt-4
+              w-full px-4 py-2 rounded-full
+              bg-blue-600 text-white
+              text-sm font-semibold
+              hover:bg-blue-700 transition shadow">
+      Upgrade now
+    </a>
   {% endif %}
+
 </div>
 
 
-  </div>
+</div>
+
 
   <!-- APPLICATION ACTIVITY SECTION -->
   <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-10">
@@ -1025,7 +1021,6 @@ async function loadMetrics() {
   });
 }
 </script>
-
 
 
 {% endblock %}
