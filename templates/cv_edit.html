@@ -57,6 +57,7 @@
         <label class="block">
           <span class="text-gray-700 font-medium">Phone</span>
           <input type="text" name="phone"
+                 id="phoneInput"
                  value="{{ cv.phone or '' }}"
                  pattern="^\+\d{6,15}$"
                  title="Must start with + and include your country code, for example +447912345678"
@@ -311,5 +312,41 @@
 
   </form>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const phoneInput = document.getElementById("phoneInput");
+  const form = document.getElementById("cvForm");
+
+  if (!phoneInput) return;
+
+  function normalisePhone(value) {
+    if (!value) return "";
+
+    const hasPlus = value.trim().startsWith("+");
+
+    // Remove everything except digits
+    const digits = value.replace(/[^\d]/g, "");
+
+    return hasPlus ? "+" + digits : digits;
+  }
+
+  // ✅ NORMALISE EXISTING VALUE ON LOAD
+  phoneInput.value = normalisePhone(phoneInput.value);
+
+  // Clean while typing
+  phoneInput.addEventListener("input", () => {
+    const pos = phoneInput.selectionStart;
+    phoneInput.value = normalisePhone(phoneInput.value);
+    phoneInput.setSelectionRange(pos, pos);
+  });
+
+  // Final clean before submit (failsafe)
+  form.addEventListener("submit", () => {
+    phoneInput.value = normalisePhone(phoneInput.value);
+  });
+});
+</script>
+
 
 {% endblock %}
