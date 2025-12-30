@@ -97,7 +97,7 @@ services:
     name: cron-matches-to-apply
     env: python
     branch: master
-    schedule: "20 6 * * *"
+    schedule: "*/10 * * * *"
     buildCommand: pip install -r requirements.txt
     startCommand: python workers/matches_to_apply.py
     envVars:

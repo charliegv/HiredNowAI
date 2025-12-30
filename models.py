@@ -460,3 +460,77 @@ class EmailEvent(db.Model):
             f"context={self.context} "
             f"status={self.status}>"
         )
+
+
+class StripeWebhookEvent(db.Model):
+    __tablename__ = "stripe_webhook_events"
+
+    id = db.Column(db.BigInteger, primary_key=True)
+
+    # Stripe identifiers
+    stripe_event_id = db.Column(
+        db.String(255),
+        nullable=True,
+        unique=True,
+        index=True
+    )
+
+    event_type = db.Column(
+        db.String(100),
+        nullable=True,
+        index=True
+    )
+
+    # Raw data
+    payload = db.Column(
+        db.JSON,
+        nullable=False
+    )
+
+    signature = db.Column(
+        db.Text,
+        nullable=True
+    )
+
+    # Processing state
+    processed = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False,
+        index=True
+    )
+
+    error = db.Column(
+        db.Text,
+        nullable=True
+    )
+
+    # Timing
+    received_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=datetime.utcnow,
+        index=True
+    )
+
+    processed_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=True
+    )
+
+    def mark_processed(self):
+        self.processed = True
+        self.processed_at = datetime.utcnow()
+
+    def mark_failed(self, error_message: str):
+        self.error = error_message
+        self.processed = False
+
+    def __repr__(self):
+        return (
+            f"<StripeWebhookEvent "
+            f"id={self.id} "
+            f"stripe_event_id={self.stripe_event_id} "
+            f"type={self.event_type} "
+            f"processed={self.processed}>"
+        )

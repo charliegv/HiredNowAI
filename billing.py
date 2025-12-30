@@ -1,7 +1,7 @@
 import stripe
 from flask import Blueprint, redirect, url_for, request, render_template
 from flask_login import login_required, current_user
-from models import db, SubscriptionPlan, UserSubscription, CreditLedger, CreditBalance, Profile, PendingCreditGrant
+from models import db, SubscriptionPlan, UserSubscription, CreditLedger, CreditBalance, Profile, PendingCreditGrant, StripeWebhookEvent
 import os
 from datetime import datetime
 from dotenv import load_dotenv
@@ -12,7 +12,7 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 billing_bp = Blueprint("billing", __name__)
 
-# CREDIT_PACKS_testing = {
+# CREDIT_PACKS = {
 #     "price_1Sh904RW5PkCYvO3NlxGIn1i": 15, #price_15_gbp
 #     "price_1Sh90ZRW5PkCYvO3HSVmIn1c": 15, #price_15_usd
 #     "price_1Sh91MRW5PkCYvO3HDwXxToK": 30, #price_30_gbp
@@ -297,9 +297,9 @@ def subscribe(plan_id):
             "price": plan.stripe_price_id,
             "quantity": 1,
         }],
-	    success_url=url_for("onboarding.edit_cv", _external=True),
-	    cancel_url=url_for("onboarding.onboarding_plan", _external=True),
-	    subscription_data={
+        success_url=url_for("onboarding.edit_cv", _external=True),
+        cancel_url=url_for("onboarding.onboarding_plan", _external=True),
+        subscription_data={
             "metadata": {
                 "user_id": current_user.id,
                 "plan_id": plan.id,
@@ -325,10 +325,30 @@ def extract_subscription_id(invoice):
 
     return None
 
+
 @billing_bp.route("/stripe/webhook", methods=["POST"])
 def stripe_webhook():
-    payload = request.data
+    payload = request.get_data(as_text=True)
     sig_header = request.headers.get("Stripe-Signature")
+
+    event = None
+    event_id = None
+    event_type = None
+
+    # Store raw webhook immediately
+    webhook_row = None
+    try:
+        webhook_row = StripeWebhookEvent(
+            payload=payload,
+            signature=sig_header
+        )
+        db.session.add(webhook_row)
+        db.session.commit()
+    except Exception as e:
+        print(e)
+        print("<<<<<<<<<<<<<")
+        # If this fails something is very wrong
+        return "", 500
 
     try:
         event = stripe.Webhook.construct_event(
@@ -336,16 +356,30 @@ def stripe_webhook():
             sig_header,
             os.getenv("STRIPE_WEBHOOK_SECRET"),
         )
+        event_id = event["id"]
+        event_type = event["type"]
+
+        webhook_row.stripe_event_id = event_id
+        webhook_row.event_type = event_type
+        db.session.commit()
+
     except Exception as e:
-        print("Webhook signature error:", e)
+        webhook_row.error = f"Signature error: {str(e)}"
+        db.session.commit()
         return "", 400
 
-    event_type = event["type"]
-    obj = event["data"]["object"]
-    # print(event_type)
-    # print(obj)
+    # Idempotency check
+    already_processed = (
+        StripeWebhookEvent.query
+        .filter_by(stripe_event_id=event_id, processed=True)
+        .first()
+    )
+    if already_processed:
+        return "", 200
 
     try:
+        obj = event["data"]["object"]
+
         if event_type == "checkout.session.completed":
             if obj.get("mode") == "subscription":
                 handle_checkout_completed(obj)
@@ -355,7 +389,6 @@ def stripe_webhook():
         elif event_type == "invoice.paid":
             handle_invoice_paid(obj)
 
-
         elif event_type == "invoice.payment_failed":
             if obj.get("subscription"):
                 handle_payment_failed(obj)
@@ -363,12 +396,16 @@ def stripe_webhook():
         elif event_type == "customer.subscription.deleted":
             handle_subscription_deleted(obj)
 
+        webhook_row.processed = True
+        db.session.commit()
+
     except Exception as e:
-        # IMPORTANT: log but still return 200
-        # Stripe will retry if you return 500
-        print("Webhook handler error:", e)
+        # Log error but DO NOT return 500
+        webhook_row.error = str(e)
+        db.session.commit()
 
     return "", 200
+
 
 @billing_bp.route("/billing/portal")
 @login_required
@@ -397,6 +434,8 @@ def buy_credits(price_id):
     if price_id not in CREDIT_PACKS:
         return redirect(url_for("dashboard.dashboard_home"))
 
+
+    print(current_user.stripe_customer_id if hasattr(current_user, "stripe_customer_id") else None)
     session = stripe.checkout.Session.create(
         mode="payment",
         customer=current_user.stripe_customer_id if hasattr(current_user, "stripe_customer_id") else None,
@@ -413,6 +452,7 @@ def buy_credits(price_id):
         success_url=url_for("dashboard.dashboard_home", _external=True),
         cancel_url=url_for("dashboard.dashboard_home", _external=True),
     )
+    print(session)
 
     return redirect(session.url)
 
@@ -480,5 +520,5 @@ def buy_credits_page():
         "buy_credits.html",
         plans_by_currency=plans_by_currency,
         credit_packs=credit_packs,
-	    subscription=subscription,
+        subscription=subscription,
     )
