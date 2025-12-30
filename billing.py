@@ -5,6 +5,7 @@ from models import db, SubscriptionPlan, UserSubscription, CreditLedger, CreditB
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+from onboarding import get_or_create_profile
 
 load_dotenv()
 
@@ -21,7 +22,7 @@ billing_bp = Blueprint("billing", __name__)
 #     "price_1Sh936RW5PkCYvO35L7tFQgO": 80, #price_80_usd
 # }
 CREDIT_PACKS = {
-    "price_1Sh9zFRW5PkCYvO3R6RuVAjL": 15, #price_15_gbp
+    "price_1Sh904RW5PkCYvO3NlxGIn1i": 15, #price_15_gbp
     "price_1Sh9zFRW5PkCYvO34bx7x3qZ": 15, #price_15_usd
     "price_1Sh9zDRW5PkCYvO3ZSdG84Y3": 30, #price_30_gbp
     "price_1Sh9zDRW5PkCYvO3HEaMTBD1": 30, #price_30_usd
@@ -288,6 +289,11 @@ def handle_subscription_deleted(subscription):
 @billing_bp.route("/subscribe/<int:plan_id>")
 @login_required
 def subscribe(plan_id):
+    profile = get_or_create_profile()
+    if not profile.onboarding_complete:
+        profile.onboarding_step = 7
+        db.session.commit()
+
     plan = SubscriptionPlan.query.get_or_404(plan_id)
 
     session = stripe.checkout.Session.create(
@@ -428,11 +434,18 @@ def billing_portal():
     return redirect(session.url)
 
 
+
 @billing_bp.route("/buy-credits/<price_id>")
 @login_required
 def buy_credits(price_id):
     if price_id not in CREDIT_PACKS:
         return redirect(url_for("dashboard.dashboard_home"))
+
+
+    profile = get_or_create_profile()
+    if not profile.onboarding_complete:
+        profile.onboarding_step = 7
+        db.session.commit()
 
 
     print(current_user.stripe_customer_id if hasattr(current_user, "stripe_customer_id") else None)

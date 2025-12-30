@@ -92,6 +92,11 @@ class Profile(db.Model):
     deactivate_reason = db.Column(db.String(50))
     onboarding_step = db.Column(db.Integer, default=1, nullable=False)
 
+    job_search_intent = db.Column(db.String(50))
+    target_apps_per_week = db.Column(db.Integer)
+    recommended_plan = db.Column(db.String(50))
+
+
 class PendingApplication(db.Model):
     __tablename__ = "pending_applications"
 

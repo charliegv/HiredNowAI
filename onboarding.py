@@ -11,7 +11,7 @@ import os
 from utils.s3_uploader import upload_to_s3
 from utils.background import run_async
 from utils.credits import init_credit_balance
-from utils.onboarding import resume_onboarding
+from utils.onboarding import resume_onboarding, recommend_plan
 
 onboarding = Blueprint("onboarding", __name__)
 
@@ -244,7 +244,7 @@ def step4():
         db.session.commit()
 
         # Redirect to success dashboard or next step
-        return redirect(url_for("onboarding.onboarding_plan"))
+        return redirect(url_for("onboarding.onboarding_intent"))
 
     return render_template("onboarding_step4.html", profile=profile, step=4, progress=80)
 
@@ -273,7 +273,7 @@ def cv_preview():
 def edit_cv():
     profile = get_or_create_profile()
     if not profile.onboarding_complete:
-        profile.onboarding_step = 6
+        profile.onboarding_step = 7
         db.session.commit()
 
     if request.method == "POST":
@@ -400,10 +400,102 @@ def onboarding_plan():
         "USD": [p for p in plans if p.currency == "usd"],
     }
 
+    profile = get_or_create_profile()
+
     return render_template(
-        "onboarding_plan.html",
-        plans_by_currency=plans_by_currency,
-        step=5,
-        progress=100,
+	    "onboarding_plan.html",
+	    plans_by_currency=plans_by_currency,
+	    recommended_plan=profile.recommended_plan,
+	    step=6,
+	    progress=100,
     )
 
+
+@onboarding.route("/onboarding/intent", methods=["GET", "POST"])
+@login_required
+def onboarding_intent():
+    profile = get_or_create_profile()
+
+    # Prevent skipping
+    if profile.onboarding_step < 5:
+        return resume_onboarding(profile)
+
+    if request.method == "POST":
+        intent = request.form.get("job_search_intent")
+        weekly_apps = int(request.form.get("target_apps_per_week", 0))
+
+        profile.job_search_intent = intent
+        profile.target_apps_per_week = weekly_apps
+        profile.recommended_plan = recommend_plan(intent, weekly_apps)
+        profile.onboarding_step = 6
+
+        db.session.commit()
+
+        return redirect(url_for("onboarding.onboarding_plan"))
+
+    return render_template(
+        "onboarding_intent.html",
+        step=5,
+        progress=90
+    )
+
+
+
+@onboarding.route("/onboarding/credits", methods=["GET"])
+@login_required
+def onboarding_credits():
+    profile = get_or_create_profile()
+
+    # Prevent skipping onboarding
+    if profile.onboarding_step < 6:
+        return resume_onboarding(profile)
+
+    # Reuse credit pack data from billing logic
+    credit_packs = {
+        "GBP": [
+            {
+                "price_id": "price_1Sh9zFRW5PkCYvO3R6RuVAjL",
+                "credits": 15,
+                "price": 5,
+                "currency_symbol": "£",
+            },
+            {
+                "price_id": "price_1Sh9zDRW5PkCYvO3ZSdG84Y3",
+                "credits": 30,
+                "price": 10,
+                "currency_symbol": "£",
+            },
+            {
+                "price_id": "price_1Sh9zARW5PkCYvO345OoUqX7",
+                "credits": 80,
+                "price": 25,
+                "currency_symbol": "£",
+            },
+        ],
+        "USD": [
+            {
+                "price_id": "price_1Sh9zFRW5PkCYvO34bx7x3qZ",
+                "credits": 15,
+                "price": 7,
+                "currency_symbol": "$",
+            },
+            {
+                "price_id": "price_1Sh9zDRW5PkCYvO3HEaMTBD1",
+                "credits": 30,
+                "price": 14,
+                "currency_symbol": "$",
+            },
+            {
+                "price_id": "price_1Sh9zARW5PkCYvO3VCh2gK9S",
+                "credits": 80,
+                "price": 34,
+                "currency_symbol": "$",
+            },
+        ],
+    }
+
+    return render_template(
+        "onboarding_credits.html",
+        credit_packs=credit_packs,
+        is_onboarding=True
+    )

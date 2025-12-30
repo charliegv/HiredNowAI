@@ -1,0 +1,151 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="max-w-3xl mx-auto bg-white p-10 rounded-2xl shadow-md">
+
+  {% include "components/progress.html" with context %}
+
+  <h1 class="text-3xl font-bold mb-4 text-gray-900 text-center">
+    Help us tailor HiredNow for you
+  </h1>
+
+  <p class="text-gray-600 text-center mb-10">
+    Answer two quick questions so we can recommend the right setup.
+  </p>
+
+  <form method="POST" class="space-y-12">
+
+    <!-- INTENT -->
+    <div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">
+        What best describes your goal?
+      </h2>
+
+      <div class="space-y-4">
+
+        <label class="block cursor-pointer">
+          <input type="radio" name="job_search_intent" value="fast" class="peer hidden" required>
+          <div class="border border-gray-300 rounded-2xl p-6 transition
+                      hover:shadow-md
+                      peer-checked:border-orange-500
+                      peer-checked:bg-orange-50
+                      peer-checked:ring-2 peer-checked:ring-orange-200">
+            <h3 class="font-semibold text-gray-900">
+              I want to get hired quickly with minimal effort
+            </h3>
+            <p class="text-sm text-gray-600 mt-1">
+              Let automation do most of the work for me
+            </p>
+          </div>
+        </label>
+
+        <label class="block cursor-pointer">
+          <input type="radio" name="job_search_intent" value="scale" class="peer hidden">
+          <div class="border border-gray-300 rounded-2xl p-6 transition
+                      hover:shadow-md
+                      peer-checked:border-orange-500
+                      peer-checked:bg-orange-50
+                      peer-checked:ring-2 peer-checked:ring-orange-200">
+            <h3 class="font-semibold text-gray-900">
+              I am actively applying and want to scale
+            </h3>
+            <p class="text-sm text-gray-600 mt-1">
+              Increase volume without losing relevance
+            </p>
+          </div>
+        </label>
+
+        <label class="block cursor-pointer">
+          <input type="radio" name="job_search_intent" value="explore" class="peer hidden">
+          <div class="border border-gray-300 rounded-2xl p-6 transition
+                      hover:shadow-md
+                      peer-checked:border-orange-500
+                      peer-checked:bg-orange-50
+                      peer-checked:ring-2 peer-checked:ring-orange-200">
+            <h3 class="font-semibold text-gray-900">
+              I am casually exploring opportunities
+            </h3>
+            <p class="text-sm text-gray-600 mt-1">
+              Apply selectively when something looks good
+            </p>
+          </div>
+        </label>
+
+        <label class="block cursor-pointer">
+          <input type="radio" name="job_search_intent" value="browse" class="peer hidden">
+          <div class="border border-gray-300 rounded-2xl p-6 transition
+                      hover:shadow-md
+                      peer-checked:border-orange-500
+                      peer-checked:bg-orange-50
+                      peer-checked:ring-2 peer-checked:ring-orange-200">
+            <h3 class="font-semibold text-gray-900">
+              I am just browsing for now
+            </h3>
+            <p class="text-sm text-gray-600 mt-1">
+              No rush, just want to see what is out there
+            </p>
+          </div>
+        </label>
+
+      </div>
+    </div>
+
+    <!-- VOLUME -->
+    <div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">
+        Ideal number of applications per week
+      </h2>
+
+      <div class="space-y-3">
+
+        <label class="block cursor-pointer">
+          <input type="radio" name="target_apps_per_week" value="5" class="peer hidden" required>
+          <div class="border border-gray-300 rounded-xl p-4 transition
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50">
+            5 to 10 applications
+          </div>
+        </label>
+
+        <label class="block cursor-pointer">
+          <input type="radio" name="target_apps_per_week" value="15" class="peer hidden">
+          <div class="border border-gray-300 rounded-xl p-4 transition
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50">
+            10 to 25 applications
+          </div>
+        </label>
+
+        <label class="block cursor-pointer">
+          <input type="radio" name="target_apps_per_week" value="35" class="peer hidden">
+          <div class="border border-gray-300 rounded-xl p-4 transition
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50">
+            25 to 50 applications
+          </div>
+        </label>
+
+        <label class="block cursor-pointer">
+          <input type="radio" name="target_apps_per_week" value="60" class="peer hidden">
+          <div class="border border-gray-300 rounded-xl p-4 transition
+                      peer-checked:border-orange-500 peer-checked:bg-orange-50">
+            50 plus applications
+          </div>
+        </label>
+
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <button
+      class="w-full bg-blue-600 text-white py-4 rounded-full text-lg font-semibold
+             hover:bg-blue-700 transition shadow-md">
+      Show my recommended plan
+    </button>
+
+    <p class="text-xs text-gray-500 text-center mt-2">
+      You can change this later at any time
+    </p>
+
+  </form>
+
+</div>
+
+{% endblock %}
