@@ -20,9 +20,11 @@ async def process_auto_applications():
     users = await conn.fetch("""
         SELECT p.user_id
         FROM profile p
+        join credit_balance cb on cb.user_id = p.user_id 
         WHERE p.application_mode = 'auto'
           AND p.onboarding_complete = TRUE
           AND p.is_active = TRUE
+		and cb.available_credits > 0 
     """)
 
     print(f"[AUTO WORKER] Found {len(users)} eligible auto users")
