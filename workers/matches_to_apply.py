@@ -12,7 +12,11 @@ MAX_APPLICATIONS_PER_DAY = 30
 
 async def process_auto_applications():
     db_url = os.getenv("DATABASE_URL")
-    conn = await asyncpg.connect(db_url)
+    conn = await asyncpg.connect(
+	    db_url,
+	    timeout=30,
+	    ssl="require"
+    )
 
     print("[AUTO WORKER] Starting auto application enqueue")
 
