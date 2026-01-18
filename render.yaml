@@ -139,3 +139,22 @@ services:
         sync: false
       - key: MAILGUN_API_KEY
         sync: false
+  # -----------------------------------------------------
+  # 7. Cron Job – SEO Snapshots + Sitemap
+  # -----------------------------------------------------
+  - type: cron
+    name: cron-seo-snapshots
+    env: python
+    branch: master
+    schedule: "0 9 * * *"   # daily at 09:00 UTC
+    buildCommand: pip install -r requirements.txt
+    startCommand: python workers/seo_snapshot_worker.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_S3_BUCKET
+        sync: false
