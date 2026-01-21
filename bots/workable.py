@@ -84,6 +84,8 @@ class WorkableBot(BaseATSBot):
     async def human_sleep(self, min_s=0.4, max_s=1.2):
         await asyncio.sleep(random.uniform(min_s, max_s))
 
+
+
     async def human_mouse_move(self, page, target_x, target_y, steps=20):
         start_x = random.uniform(50, 200)
         start_y = random.uniform(80, 180)
@@ -152,6 +154,20 @@ class WorkableBot(BaseATSBot):
             return {"server": f"http://{ip}:{port}"}
 
         return None
+
+    def _is_negative_eligibility_question(self, text: str) -> bool:
+        t = text.lower()
+        return any(k in t for k in [
+            "convicted",
+            "criminal",
+            "felony",
+            "misdemeanor",
+            "criminal record",
+            "offence",
+            "offense",
+            "arrested",
+            "charged with a crime",
+        ])
 
     def pick_user_agent(self):
         return random.choice(self.user_agents)
@@ -1394,6 +1410,11 @@ class WorkableBot(BaseATSBot):
                 continue
             label_norm = self._normalise_text(label_text)
 
+            if self._is_negative_eligibility_question(label_norm):
+                # Explicitly select NO
+                await self._handle_yes_no_radio(block, value=False)
+                continue
+
             # --------------------------------------------------------------------
             # 1. Workable custom checkbox & radio groups (MUST BE FIRST)
             # --------------------------------------------------------------------
@@ -1946,7 +1967,7 @@ class WorkableBot(BaseATSBot):
 
         try:
             resp = await client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o" if not short_mode else "gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": system_msg},
                     {"role": "user", "content": json.dumps(user_msg)},
@@ -1959,7 +1980,10 @@ class WorkableBot(BaseATSBot):
             if self.debug:
                 print("[Workable DEBUG] AI call error:", e)
             if short_mode:
+                if self._is_negative_eligibility_question(question):
+                    return "No"
                 return "Yes"
+
             return (
                 "My experience and skills align well with this position and I am motivated "
                 "to contribute to strong results for the team."
