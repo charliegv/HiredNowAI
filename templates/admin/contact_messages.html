@@ -1,0 +1,120 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto py-8">
+
+  <!-- Header -->
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold text-gray-900">Contact messages</h1>
+      <p class="text-gray-600 text-sm mt-1">
+        Messages submitted via the contact form
+      </p>
+    </div>
+  </div>
+
+  <!-- Messages table -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+
+    <table class="w-full text-left">
+      <thead>
+        <tr class="border-b text-sm text-gray-600 bg-gray-50">
+          <th class="py-3 px-4">Status</th>
+          <th class="py-3 px-4">Name</th>
+          <th class="py-3 px-4">Email</th>
+          <th class="py-3 px-4">Subject</th>
+          <th class="py-3 px-4">Received</th>
+          <th class="py-3 px-4 text-right">Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% if messages.items %}
+          {% for msg in messages.items %}
+          <tr class="border-b hover:bg-gray-50 transition">
+
+            <!-- Status -->
+            <td class="py-3 px-4">
+              {% if msg.replied_at %}
+                <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
+                  Replied
+                </span>
+              {% else %}
+                <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">
+                  Unreplied
+                </span>
+              {% endif %}
+            </td>
+
+            <!-- Name -->
+            <td class="py-3 px-4 font-medium text-gray-900">
+              {{ msg.name }}
+            </td>
+
+            <!-- Email -->
+            <td class="py-3 px-4 text-gray-700">
+              <a href="mailto:{{ msg.email }}" class="text-blue-600 hover:underline">
+                {{ msg.email }}
+              </a>
+            </td>
+
+            <!-- Subject -->
+            <td class="py-3 px-4 text-gray-700">
+              {{ msg.subject or "No subject" }}
+            </td>
+
+            <!-- Date -->
+            <td class="py-3 px-4 text-gray-600 text-sm">
+              {{ msg.created_at.strftime('%d %b %Y %H:%M') }}
+            </td>
+
+            <!-- Action -->
+            <td class="py-3 px-4 text-right">
+              <a href="{{ url_for('admin.contact_message_detail', message_id=msg.id) }}"
+                 class="text-blue-600 hover:text-blue-700 font-medium text-sm">
+                View
+              </a>
+            </td>
+
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="6" class="py-6 text-center text-gray-500">
+              No contact messages found.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if messages.pages > 1 %}
+  <div class="mt-6 flex justify-between items-center text-sm">
+
+    <div class="text-gray-600">
+      Page {{ messages.page }} of {{ messages.pages }}
+    </div>
+
+    <div class="flex space-x-2">
+      {% if messages.has_prev %}
+        <a href="{{ url_for('admin.contact_messages', page=messages.prev_num) }}"
+           class="px-3 py-1 border rounded-md hover:bg-gray-100">
+          Previous
+        </a>
+      {% endif %}
+
+      {% if messages.has_next %}
+        <a href="{{ url_for('admin.contact_messages', page=messages.next_num) }}"
+           class="px-3 py-1 border rounded-md hover:bg-gray-100">
+          Next
+        </a>
+      {% endif %}
+    </div>
+
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

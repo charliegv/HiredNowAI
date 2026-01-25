@@ -1,0 +1,116 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8">
+
+  <!-- Header -->
+  <div class="mb-6">
+    <a href="{{ url_for('admin.contact_messages') }}"
+       class="text-sm text-blue-600 hover:underline">
+      ← Back to messages
+    </a>
+
+    <h1 class="text-2xl font-semibold text-gray-900 mt-2">
+      Contact message
+    </h1>
+  </div>
+
+  <!-- Message card -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+
+    <!-- Meta -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div>
+        <p class="text-sm text-gray-500">From</p>
+        <p class="font-medium text-gray-900">{{ msg.name }}</p>
+        <a href="mailto:{{ msg.email }}"
+           class="text-blue-600 hover:underline text-sm">
+          {{ msg.email }}
+        </a>
+      </div>
+
+      <div>
+        <p class="text-sm text-gray-500">Received</p>
+        <p class="text-gray-900">
+          {{ msg.created_at.strftime('%d %b %Y %H:%M') }}
+        </p>
+
+        {% if msg.replied_at %}
+          <p class="mt-2 text-sm text-green-700">
+            Replied on {{ msg.replied_at.strftime('%d %b %Y %H:%M') }}
+          </p>
+        {% else %}
+          <p class="mt-2 text-sm text-yellow-700">
+            Not replied yet
+          </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Subject -->
+    <div class="mb-4">
+      <p class="text-sm text-gray-500">Subject</p>
+      <p class="font-medium text-gray-900">
+        {{ msg.subject or "No subject" }}
+      </p>
+    </div>
+
+    <!-- Message body -->
+    <div>
+      <p class="text-sm text-gray-500 mb-2">Message</p>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 whitespace-pre-wrap text-gray-800">
+        {{ msg.message }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Reply section -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+
+    {% if msg.replied_at %}
+      <!-- Already replied -->
+      <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
+        This message has already been replied to.
+      </div>
+    {% else %}
+
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">
+        Reply
+      </h2>
+
+      <form method="POST" class="space-y-4">
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Reply message
+          </label>
+          <textarea
+            name="reply"
+            rows="8"
+            required
+            class="w-full border border-gray-300 rounded-lg px-4 py-2
+                   focus:ring focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Type your reply here..."
+          ></textarea>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <p class="text-sm text-gray-500">
+            This reply will be sent from support.
+          </p>
+
+          <button
+            type="submit"
+            class="px-6 py-2 bg-blue-600 text-white rounded-lg
+                   hover:bg-blue-700 transition font-medium">
+            Send reply
+          </button>
+        </div>
+
+      </form>
+
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

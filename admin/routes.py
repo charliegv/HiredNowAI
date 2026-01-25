@@ -1,11 +1,13 @@
 from flask import Blueprint, render_template, redirect, url_for, session, abort, request
 from flask_login import login_user, current_user, login_required
 from utils.decorators import admin_required
+from utils.mailgun import send_contact_reply
 from models import User, Application, Profile, db
 from sqlalchemy import func, desc, asc
-from models import CreditBalance, CreditLedger
+from models import CreditBalance, CreditLedger, ContactMessage
 from sqlalchemy.exc import IntegrityError
 from models import CreditBalance
+from datetime import datetime
 
 
 
@@ -220,3 +222,53 @@ def remove_credits(user_id):
     )
 
     return redirect(url_for("admin.dashboard"))
+
+
+@admin_bp.route("/contact-messages")
+@admin_required
+def contact_messages():
+    page = request.args.get("page", 1, type=int)
+    per_page = 25
+
+    messages = (
+        ContactMessage.query
+        .order_by(ContactMessage.created_at.desc())
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
+
+    return render_template(
+        "admin/contact_messages.html",
+        messages=messages
+    )
+
+
+@admin_bp.route("/contact-messages/<int:message_id>", methods=["GET", "POST"])
+@admin_required
+def contact_message_detail(message_id):
+    msg = ContactMessage.query.get_or_404(message_id)
+
+    if request.method == "POST":
+        reply_body = request.form.get("reply")
+
+        if not reply_body:
+            abort(400)
+
+        r = send_contact_reply(
+            to_email=msg.email,
+            subject=f"Re: {msg.subject or 'Your message'}",
+            body=reply_body
+        )
+        print(r)
+        print(r.content)
+
+        msg.replied_at = datetime.utcnow()
+        msg.replied_by = current_user.id
+        db.session.commit()
+
+        return redirect(url_for("admin.contact_messages"))
+
+    return render_template(
+        "admin/contact_message_detail.html",
+        msg=msg
+    )
+
