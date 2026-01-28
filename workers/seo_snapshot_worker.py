@@ -700,7 +700,8 @@ def generate_sitemap(snapshots):
         "/ai-job-application",
         "/ai-job-application-tool",
         "/privacy",
-        "/terms"
+        "/terms",
+	    "/hired-now-vs"
     ]
 
     for path in static_paths:
