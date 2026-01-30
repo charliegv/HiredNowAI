@@ -814,8 +814,11 @@ class WorkableBot(BaseATSBot):
                     )
 
                     page = await context.new_page()
-                    await page.goto(job_url, timeout=60000)
-                    await page.wait_for_load_state("domcontentloaded")
+                    await page.goto(
+	                    job_url,
+	                    wait_until="domcontentloaded",
+	                    timeout=60000
+                    )
 
                     # Cookies
                     await self.human_sleep(4.8, 5.6)
