@@ -390,6 +390,16 @@ async def worker_loop():
                             WHERE id = $2
                         """, result.screenshot_url, app_id)
 
+                try:
+                    os.remove(local_cv_path)
+                except:
+                    pass
+
+                try:
+                    os.remove(custom_cv_path)
+                except:
+                    pass
+
                 if result.status == "success":
                     await mark_success(pool, app_id, user_id)
 

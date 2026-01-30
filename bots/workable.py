@@ -815,9 +815,9 @@ class WorkableBot(BaseATSBot):
 
                     page = await context.new_page()
                     await page.goto(
-	                    job_url,
-	                    wait_until="domcontentloaded",
-	                    timeout=60000
+                        job_url,
+                        wait_until="domcontentloaded",
+                        timeout=60000
                     )
 
                     # Cookies
@@ -879,6 +879,10 @@ class WorkableBot(BaseATSBot):
                     screenshot_url = upload_to_s3(
                         screenshot_path, folder="screenshots"
                     )
+                    try:
+                        os.remove(screenshot_path)
+                    except:
+                        pass
 
                     if self.test_mode:
                         return ApplyResult(
