@@ -50,7 +50,7 @@ WITH next_task AS (
       ON cb.user_id = a.user_id
     JOIN profile p
       ON p.user_id = a.user_id
-    WHERE a.status = 'pending'
+    WHERE a.status in ('pending', 'retry')
       AND a.credit_consumed = FALSE
       AND cb.available_credits > 0
       AND p.is_active = TRUE
