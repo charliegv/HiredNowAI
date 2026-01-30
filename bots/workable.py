@@ -960,13 +960,22 @@ class WorkableBot(BaseATSBot):
                             screenshot_url=screenshot_url,
                         )
 
-                    success_ui = page.locator("div[data-ui='success'], h1:has-text('Thank')")
-                    if await success_ui.count() > 0:
+                    thankyou_svg = page.locator("symbol#thankyou")
+                    form_present = await page.locator("form[data-ui='application-form']").count() > 0
+                    submit_present = await page.locator("button[data-ui='apply-button']").count() > 0
+                    thank_text = page.locator(
+                        "h1:has-text('Thank'), h2:has-text('Thank'), h3:has-text('Thank')"
+                    )
+
+                    if (await thankyou_svg.count() > 0
+                            or (not form_present and not submit_present)
+                            or await thank_text.count() > 0):
                         return ApplyResult(
                             status="success",
                             message="Submitted Workable application",
                             screenshot_url=screenshot_url,
                         )
+
                     return ApplyResult(
                         status="manual_required",
                         message="Error submitting workable application",
