@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, session
 from flask_login import login_user, logout_user, login_required
 from flask_bcrypt import Bcrypt
 from models import db, User, Profile
@@ -37,6 +37,15 @@ def signup():
 
         # Create an empty profile linked to the new user
         profile = Profile(user_id=user.id)
+
+        profile.utm_source = session.get("utm_source")
+        profile.utm_medium = session.get("utm_medium")
+        profile.utm_campaign = session.get("utm_campaign")
+        profile.utm_content = session.get("utm_content")
+        profile.utm_term = session.get("utm_term")
+        profile.first_landing_path = session.get("first_landing_path")
+        profile.first_referrer = session.get("first_referrer")
+
         db.session.add(profile)
         db.session.commit()
 

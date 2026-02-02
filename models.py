@@ -96,6 +96,14 @@ class Profile(db.Model):
     target_apps_per_week = db.Column(db.Integer)
     recommended_plan = db.Column(db.String(50))
 
+    utm_source = db.Column(db.String(255))
+    utm_medium = db.Column(db.String(255))
+    utm_campaign = db.Column(db.String(255))
+    utm_content = db.Column(db.String(255))
+    utm_term = db.Column(db.String(255))
+    first_landing_path = db.Column(db.Text)
+    first_referrer = db.Column(db.Text)
+
 
 class PendingApplication(db.Model):
     __tablename__ = "pending_applications"
