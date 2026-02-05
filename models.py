@@ -550,3 +550,17 @@ class StripeWebhookEvent(db.Model):
             f"type={self.event_type} "
             f"processed={self.processed}>"
         )
+
+
+class DismissedMatch(db.Model):
+    __tablename__ = "dismissed_matches"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    match_id = db.Column(db.Integer, db.ForeignKey("matches.id"), nullable=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "match_id", name="uq_user_dismissed_match"),
+    )

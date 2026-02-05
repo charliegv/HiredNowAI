@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, send_file, redirect, jsonify
 from flask_login import login_required, current_user
-from models import db, Profile, PendingApplication, Application, Match, Job, CreditBalance, UserSubscription
+from models import db, Profile, PendingApplication, Application, Match, Job, CreditBalance, UserSubscription, DismissedMatch
 
 from datetime import datetime
 from sqlalchemy import desc
@@ -34,42 +34,48 @@ def dashboard_home():
 
     # Fetch recent applications
     activity = Application.query \
-	    .filter(Application.user_id == current_user.id) \
-	    .filter(Application.status != "manual_required") \
-	    .order_by(Application.created_at.desc()) \
-	    .all()
+        .filter(Application.user_id == current_user.id) \
+        .filter(Application.status != "manual_required") \
+        .order_by(Application.created_at.desc()) \
+        .all()
 
     manual_required = Application.query \
-	    .filter_by(user_id=current_user.id, status="manual_required") \
-	    .order_by(Application.created_at.desc()) \
-	    .all()
+        .filter_by(user_id=current_user.id, status="manual_required") \
+        .order_by(Application.created_at.desc()) \
+        .all()
 
     matches = (
-	    db.session.query(
-		    Match,
-		    Job.title.label("job_title"),
-		    Job.company.label("company"),
-		    Job.city.label("city"),
-		    Job.state.label("state"),
-		    Job.country.label("country"),
-		    Job.is_remote.label("remote_flag")
-	    )
-	    .join(Job, Match.job_id == Job.id)
-	    .filter(Match.user_id == current_user.id)
-	    .filter(
-		    ~db.session.query(Application)
-		    .filter(Application.user_id == current_user.id)
-		    .filter(Application.job_id == Match.job_id)
-		    .exists()
-	    )
-	    .order_by(desc(Match.score))
-	    .limit(20)
-	    .all()
+        db.session.query(
+            Match,
+            Job.title.label("job_title"),
+            Job.company.label("company"),
+            Job.city.label("city"),
+            Job.state.label("state"),
+            Job.country.label("country"),
+            Job.is_remote.label("remote_flag")
+        )
+        .join(Job, Match.job_id == Job.id)
+        .filter(Match.user_id == current_user.id)
+        .filter(
+            ~db.session.query(Application)
+            .filter(Application.user_id == current_user.id)
+            .filter(Application.job_id == Match.job_id)
+            .exists()
+        )
+        .filter(
+            ~db.session.query(DismissedMatch)
+            .filter(DismissedMatch.user_id == current_user.id)
+            .filter(DismissedMatch.match_id == Match.id)
+            .exists()
+        )
+        .order_by(desc(Match.score))
+        .limit(20)
+        .all()
     )
 
     total_sent = Application.query.filter(
-	    Application.user_id == current_user.id,
-	    Application.status.in_(["success", "manual_success"])
+        Application.user_id == current_user.id,
+        Application.status.in_(["success", "manual_success"])
     ).count()
 
     match_count = Match.query.filter_by(user_id=current_user.id).count()
@@ -89,9 +95,9 @@ def dashboard_home():
         automation_running=automation_running,
         activity=activity,
         matches=matches,
-	    manual_required=manual_required,
-	    available_credits=available_credits,
-	    subscription=subscription,
+        manual_required=manual_required,
+        available_credits=available_credits,
+        subscription=subscription,
     )
 
 @dashboard.route("/application/<int:app_id>/manual-complete", methods=["POST"])
@@ -351,7 +357,7 @@ def apply_from_match(match_id):
         location=f"{job.city}, {job.state}" if job.city else None,
         salary=None,
         status="pending",
-	    job_id=job.id,
+        job_id=job.id,
     )
 
     db.session.add(new_app)
@@ -387,3 +393,30 @@ def dashboard_metrics():
     values = [row[1] for row in rows]
 
     return jsonify({"labels": labels, "values": values})
+
+@dashboard.route("/match/<int:match_id>/dismiss", methods=["POST"])
+@login_required
+def dismiss_match(match_id):
+    match = Match.query.get_or_404(match_id)
+
+    # ownership check
+    if match.user_id != current_user.profile.user_id:
+        return {"success": False}, 403
+
+    # only allow for manual users
+    if current_user.profile.application_mode != "approval":
+        return {"success": False}, 403
+
+    exists = DismissedMatch.query.filter_by(
+        user_id=current_user.id,
+        match_id=match.id
+    ).first()
+
+    if not exists:
+        db.session.add(DismissedMatch(
+            user_id=current_user.id,
+            match_id=match.id
+        ))
+        db.session.commit()
+
+    return {"success": True}
